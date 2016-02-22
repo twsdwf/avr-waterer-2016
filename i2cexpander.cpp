@@ -5,6 +5,14 @@
 #include "config_defines.h"
 #include "configuration.h"
 
+#define AIN_PIN			?
+#define PCF_PIN_A		7
+#define PCF_PIN_B		3
+#define PCF_PIN_C		1
+#define PCF_PIN_D		0
+#define PCF_PIN_INH		2	//should be default HIGH 
+
+
 #include "i2cexpander.h"
 extern "C" {
 	#include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -14,10 +22,12 @@ static volatile uint32_t ticks = 0;
 
 extern Configuration g_cfg;
 
-I2CExpander::I2CExpander(){
+I2CExpander::I2CExpander()
+{
 	i2c_is_on = false;
 	mode = 0;
 }
+
 I2CExpander::~I2CExpander(){
 
 }
@@ -76,27 +86,8 @@ bool I2CExpander::findNext(uint8_t from_addr, uint8_t to_addr, uint8_t*founded_d
 	return false;
 }
 
-int32_t I2CExpander::read_pin_value(uint8_t addr, uint8_t pin)
-{
-	uint32_t n = 0;
-	bool should_off = false;
-	if(!i2c_is_on) {
-		i2c_on();
-		should_off = true;
-	}
-	///TODO: медиана, а не среднее арифметическое
-	for (int i = 0 ; i < g_cfg.gcfg.sensor_measures; ++i) {
-		n += read_pin(addr, pin);
-// 		Serial1.println(n, DEC);
-	}
 
-	if (should_off) {
-		i2c_off();
-	}
-	return round( (n / g_cfg.gcfg.sensor_measures)*(1000./g_cfg.gcfg.sensor_read_time) );
-}
-
-int32_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
+int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 {
 	uint32_t n = 0;
 	bool should_off = false;
@@ -117,21 +108,18 @@ int32_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 // delay(1000);
 // PORTE = PINE ^ (1<<2);
 // delay(1000);
-
-		cli();
-			ticks = 0;
-			EICRB &= 0xFC;
-			EICRB |= 2;
-			EIMSK |= (1<<4);
-		sei();
-
+		this->write(PCF_PIN_INH, HIGH);
+		this->write(PCF_PIN_A, pin & 1);
+		this->write(PCF_PIN_B, pin & 2);
+		this->write(PCF_PIN_C, pin & 4);
+		this->write(PCF_PIN_D, pin & 8);
+		this->write(PCF_PIN_INH, LOW);
+		
 		delay(g_cfg.gcfg.sensor_read_time);
 
-		cli();
-			n = ticks;
-			EIMSK &= ~(1<<4);
-		sei();
-		this->digitalWrite(pin, LOW);
+		n = analogRead(AIN_PIN);
+		
+		this->write(PCF_PIN_INH, HIGH);
 	if (should_off) {
 		i2c_off();
 	}

@@ -8,9 +8,9 @@ CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable
 AVRDUDE_CONF = /root/arduino-1.6.5-r5/hardware/tools/avr/etc/avrdude.conf
 AVRDUDE = /root/arduino-1.6.5-r5/hardware/tools/avr/bin/avrdude
 ARDUINO_DIR=/root/arduino-1.6.5-r5
-ARDUINO_LIB_PATH=/ardugit/waterer/libs
-USER_LIB_PATH=/ardugit/waterer/libs
-ARDUINO_PLATFORM_LIB_PATH=/ardugit/waterer/libs
+ARDUINO_LIB_PATH=/ardugit/new_water/libs
+USER_LIB_PATH=/ardugit/new_water/libs
+ARDUINO_PLATFORM_LIB_PATH=/ardugit/new_water/libs
 include /ardugit/arduinomk/Arduino.mk
 
 

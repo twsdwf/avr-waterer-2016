@@ -1,5 +1,12 @@
 #include <Servo.h>
+/*
+ * надо сделать:
+ = насос,счётчик жидкости
+ = опрос датчиков
+ = конфиг полива(растения,горки,датчики,х,у,итд)
+ = полив по программам
 
+ */
 #define TWI_BUFFER_LENGTH	16
 #define BUFFER_LENGTH		16
 
@@ -8,7 +15,7 @@
 #include "RTClib.h"
 #include <AT24Cxxx.h>
 #include <math.h>
-#include <MCP23017.h>
+#include <PCF8574.h>
 
 #include "config_defines.h"
 #include "awtypes.h"
