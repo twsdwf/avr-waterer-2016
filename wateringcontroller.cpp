@@ -136,7 +136,7 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 		}
 	}
 
-	uint32_t val = i2cexp->read_pin_value(pot.sensor.dev_addr, pot.sensor.pin);
+	uint16_t val = i2cexp->read_pin(pot.sensor.dev_addr, pot.sensor.pin);
 	bool should_water = check_watering_program(index, pot, val);
 
 // 	if (log) {

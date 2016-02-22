@@ -85,7 +85,7 @@ void scanFunc( byte addr, byte result )
 		Serial1.println(" DS1307 clock");
 	} else if ( (addr & 0xF8) == (0xF8 & I2C_MEMORY_ADDRESS) ) {
 		Serial1.println(" memory chip");
-	} else if ( (addr & 0xF8) == MCP23017_ADDRESS) {
+	} else if ( (addr & 0xF8) == PCF8574_ADDRESS) {
 		Serial1.println(" MCP23017/PCF8574");
 	} else {
 		Serial1.println("unknown device");
@@ -438,7 +438,7 @@ bool doCommand(char*cmd)
 // 			wctl.check_pot_state(index, false);
 		}
 	} else if (IS(cmd, "sst", 3)) {
-		i2cExpander.set_mode(0);
+// 		i2cExpander.set_mode(0);
 		i2cExpander.i2c_on();
 		Wire.begin();
 		for (int i=0; i < g_cfg.gcfg.pots_count; ++i) {
@@ -471,20 +471,20 @@ bool doCommand(char*cmd)
 	} else if (IS("test", cmd, 4)) {
 		//test addr pin
 		cmd += 5;
-		i2cExpander.set_mode(0);
+// 		i2cExpander.set_mode(0);
 		int8_t addr, pin=-1;
 		set_field<int8_t>(addr, &cmd);
 		set_field<int8_t>(pin, &cmd);
-		if(pin >=0) {
-			Serial1.println(i2cExpander.calibrate_pin(addr, pin, g_cfg.gcfg.sensor_measures), DEC);
-		} else {
-			i2cExpander.calibrate_dev(addr, g_cfg.gcfg.sensor_measures);
-		}
+// 		if(pin >=0) {
+// 			Serial1.println(i2cExpander.calibrate_pin(addr, pin, g_cfg.gcfg.sensor_measures), DEC);
+// 		} else {
+// 			i2cExpander.calibrate_dev(addr, g_cfg.gcfg.sensor_measures);
+// 		}
 	} else if (IS("cal", cmd, 3)) {
 		//cal <DNW> addr pin
 		cmd += 4;
 		Serial1.println(*cmd);
-		if(*cmd == 'N' || *cmd == 'n') {
+		/*if(*cmd == 'N' || *cmd == 'n') {
 			i2cExpander.set_mode(1);
 		} else if(*cmd == 'D' || *cmd == 'd') {
 			i2cExpander.set_mode(2);
@@ -492,7 +492,7 @@ bool doCommand(char*cmd)
 			i2cExpander.set_mode(3);
 		} else {
 			i2cExpander.set_mode(0);
-		}
+		}*/
 		int8_t addr=-1, pin=-1;
 		cmd+=2;
 		Serial1.println(cmd);
@@ -501,11 +501,11 @@ bool doCommand(char*cmd)
 		Serial1.print(addr, DEC);
 		Serial1.print("/");
  		Serial1.println(pin, DEC);
-		if(pin >=0) {
-			i2cExpander.calibrate_pin(addr, pin, g_cfg.gcfg.sensor_measures);
-		} else {
-			i2cExpander.calibrate_dev(addr, g_cfg.gcfg.sensor_measures);
-		}
+// 		if(pin >=0) {
+// 			i2cExpander.calibrate_pin(addr, pin, g_cfg.gcfg.sensor_measures);
+// 		} else {
+// 			i2cExpander.calibrate_dev(addr, g_cfg.gcfg.sensor_measures);
+// 		}
 	} else if (IS("i2c", cmd, 3)) {
 		if (IS(cmd+4, "scan", 4)) {
 			i2cExpander.i2c_on();

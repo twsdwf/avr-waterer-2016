@@ -15,7 +15,7 @@ PAGE		content
 17			pot0
 
  */
-
+#define PCF8574_ADDRESS		0x20
 #define CONFIG_MAGIC		0x55
 #define CONFIG_VERSION		0x33
 

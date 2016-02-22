@@ -5,7 +5,7 @@
 #include "config_defines.h"
 #include "configuration.h"
 
-#define AIN_PIN			?
+#define AIN_PIN			1 //analog
 #define PCF_PIN_A		7
 #define PCF_PIN_B		3
 #define PCF_PIN_C		1
@@ -25,24 +25,24 @@ extern Configuration g_cfg;
 I2CExpander::I2CExpander()
 {
 	i2c_is_on = false;
-	mode = 0;
+// 	mode = 0;
 }
 
 I2CExpander::~I2CExpander(){
 
 }
 
-uint8_t I2CExpander::get_mode()
-{
-	return this->mode;
-}
+// uint8_t I2CExpander::get_mode()
+// {
+// 	return this->mode;
+// }
 
-void I2CExpander::set_mode(uint8_t m)
-{
-	this->mode = m;
+// void I2CExpander::set_mode(uint8_t m)
+// {
+// 	this->mode = m;
 // 	Serial1.print("mode=");
 // 	Serial1.println(m);
-}
+// }
 
 bool I2CExpander::i2c_on()
 {
@@ -95,19 +95,13 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 		i2c_on();
 		should_off = true;
 	}
-		this->begin(addr - MCP23017_ADDRESS);
-		this->pinMode(pin, OUTPUT);
-		this->digitalWrite(pin, HIGH);
+		this->begin(addr);
+		this->write(pin, HIGH);
 		delay(g_cfg.gcfg.sensor_init_time);
-// 		DDRE  &= ~(1<<4);
-//  		PORTE |= (1<<4);
+
 		pinMode(4, INPUT);
 		digitalWrite(4, HIGH);
-// pinMode(2, OUTPUT);
-// PORTE |= (1<<2);
-// delay(1000);
-// PORTE = PINE ^ (1<<2);
-// delay(1000);
+
 		this->write(PCF_PIN_INH, HIGH);
 		this->write(PCF_PIN_A, pin & 1);
 		this->write(PCF_PIN_B, pin & 2);
@@ -126,113 +120,14 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 	return n;
 }
 
-bool I2CExpander::calibrate_pin(uint8_t addr, uint8_t pin, uint8_t measures)
-{
-	int32_t vals[ measures ];
-	bool should_off = false;
-	if (!i2c_is_on) {
-		this->i2c_on();
-		should_off = true;
-	}
-// 		if (mode) {
-// 		Serial1.print("dev ");
-// 		Serial1.print(addr, DEC);
-// 		Serial1.print(" pin ");
-// 		Serial1.println(pin, DEC);
-// 		}
-	int8_t i;
-		for (i = 0; i < measures; ++i) {
-			vals[i] = this->read_pin(addr, pin);
-			if(vals[i] < 10) {
-// 				Serial1.print("              PIN ");
-// 				Serial1.print(pin, DEC);
-// 				Serial1.println(" IS DEAD");
-				if (should_off) {
-					this->i2c_off();
-				}
-				return false;
-			}
-// 				Serial1.println(vals[i], DEC);
-			delay(g_cfg.gcfg.sensor_init_time);
-		}
-	if (should_off) {
-		this->i2c_off();
-	}
-	bool nc = true;
-	int32_t t;
-	for (i = 0; i < measures; ++i) {
-		nc = true;
-		for (int8_t j = 1; j < measures; ++j) {
-			if (vals[j-1] > vals[j]) {
-				t = vals[ j-1 ];
-				vals[ j-1 ] = vals[ j ];
-				vals[  j  ] = t;
-				nc = false;
-			}
-		}//for j
-		if (nc) break;
-	}//for i
-// 	char buf[16] = {0};
-// 	for (i = 0; i < measures; ++i) {
-// 		Serial1.print(vals[i], DEC);
-// 		Serial1.print(" ");
-// 	}
-// 	Serial1.println();
-	int32_t noise = abs(vals[ measures > 3 ? 1 : 0 ] - vals[ (measures > 3) ? (measures - 2) : (measures - 1) ]) >> 1;
-// 	Serial1.print("\nnoise=");
-// 	Serial1.println(noise, DEC);
-	if (mode > 0) {
-		bool found = false;
-		potConfig pot;
-		uint8_t pi = 0;
-		for (; pi < g_cfg.gcfg.pots_count; ++pi) {
-			pot = g_cfg.readPot(pi);
-			if(pot.sensor.dev_addr == addr && pot.sensor.pin == pin) {
-				found = true;
-				break;
-			}
-		}//for pi
-		if (!found) {
-			Serial1.println("sensor not found in pots");
-			return false;
-		}
-		pot.sensor.noise_delta = max(noise, pot.sensor.noise_delta);
-		if (mode == 1) {
-// 			pot.sensor.no_soil_freq =  vals[ measures>>1 ];
-		} else if(mode == 2) {
-// 			pot.sensor.dry_freq = vals[ measures>>1 ];
-		} else if(mode==3) {
-// 			pot.sensor.wet_freq = vals[ measures>>1 ];
-		}
-		g_cfg.savePot(pi, pot);
-	}//if mode
-	return true;
-}
-
-void I2CExpander::calibrate_dev(uint8_t addr, uint8_t measures_count)
-{
-	bool should_off = false;
-	if (!i2c_is_on) {
-		this->i2c_on();
-		should_off = true;
-	}
-		for (uint8_t i = 0; i < 16; ++ i) {
-// 			Serial1.print("calibrate pin #");
-// 			Serial1.println(i, DEC);
-			this->calibrate_pin(addr, i, measures_count);
-		}
-	if (should_off) {
-		this->i2c_off();
-	}
-}
 
 bool I2CExpander::ping(bool print_out)
 {
 	uint8_t dummy;
-	uint8_t rc = twi_writeTo(MCP23017_ADDRESS | i2caddr, &dummy, 0, 1, 0);
+	uint8_t rc = twi_writeTo(_address, &dummy, 0, 1, 0);
 	if (print_out) {
 		Serial1.print("expander ");
-		Serial1.print(i2caddr, DEC);
+		Serial1.print(_address, DEC);
 	}
 	if (rc) {
 		if (print_out) {
@@ -245,18 +140,4 @@ bool I2CExpander::ping(bool print_out)
 		}
 		return true;
 	}
-}
-
-// static volatile uint8_t state = 0;
-
-ISR(INT4_vect)
-{
-  ++ticks;
-//   state = 1 - state;
-//   if(state) {
-// 	  PORTE |=4;
-//   } else {
-// 	  PORTE = PINE & (~(2));
-//   }
-// 	PORTE = PINE ^ (1<<2);
 }

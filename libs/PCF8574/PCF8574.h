@@ -24,7 +24,9 @@
 class PCF8574
 {
   public:
-  PCF8574(int address);
+	  
+  PCF8574();
+  void begin(int address);
 
   uint8_t read8();
   uint8_t read(uint8_t pin);

@@ -19,11 +19,16 @@
 
 #include <Wire.h>
 
-PCF8574::PCF8574(int address)
+PCF8574::PCF8574()
+{
+}
+
+void PCF8574::begin(int address)
 {
   _address = address;
   Wire.begin();
 }
+
 
 uint8_t PCF8574::read8()
 {
