@@ -216,7 +216,7 @@ typedef struct WaterDoserSystemConfig{
 
 typedef struct globalConfig{
 	uint16_t enabled:1;
-	uint16_t flags;
+	uint16_t flags:15;
 // 	uint8_t i2c_expanders_count;
 	uint8_t pots_count;
 // 	uint8_t dosers_count;
