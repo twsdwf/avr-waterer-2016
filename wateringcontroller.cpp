@@ -20,49 +20,11 @@ extern Configuration g_cfg;
 // extern ShiftOut hc595;
 extern WaterDoserSystem water_doser;
 extern I2CExpander i2cExpander;
+extern uint32_t last_check_time;
 
 // extern ErrLogger logger;
 
 #define POTS_AT_ONCE	24
-
-void WateringController::__sort(int8_t* dosers, int8_t* pots, int8_t sz)
-{
-	bool changed = false;
-	int8_t tmp;
-// 	Serial1.println("before sorting");
-// 	for (int8_t i=0;i < sz; ++i) {
-// 		Serial1.print(pots[i], DEC);
-// 		Serial1.print("=>");
-// 		Serial1.print(dosers[i], DEC);
-// 		Serial1.print("; ");
-// 	}
-// 	Serial1.println();
-	do {
-		changed = false;
-		for (int8_t i=0;i < sz-1; ++i) {
-			for (int8_t j = i + 1; j < sz; ++j) {
-				if (dosers[i] > dosers[j]) {
-					tmp = dosers[i];
-					dosers[i] = dosers[j];
-					dosers[j] = tmp;
-					tmp = pots[i];
-					pots[i] = pots[j];
-					pots[j] = tmp;
-					changed = true;
-				}
-			}
-		}
-	} while (changed);
-// 	Serial1.println("after sorting");
-// 	for (int8_t i=0;i < sz; ++i) {
-// 		Serial1.print(pots[i], DEC);
-// 		Serial1.print("=>");
-// 		Serial1.print(dosers[i], DEC);
-// 		Serial1.print("; ");
-// 	}
-// 	Serial1.println();
-}
-
 
 WateringController::WateringController(I2CExpander* _exp) {
 	init(_exp);
@@ -82,14 +44,15 @@ void WateringController::init(I2CExpander* _exp)
 
 int WateringController::run_checks()
 {
+	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_READ);
 	i2cexp->i2c_on();
 	memset(pot_states, 0, sizeof(pot_states));
-// 	for (int i = DS1307_POT_STATE_ADDRESS_BEGIN; i < DS1307_POT_STATE_ADDRESS_END; ++i) {
-// 		clock.writeRAMbyte(i, 0);
-// 	}//for i
+ 	for (int i = RAM_POT_STATE_ADDRESS_BEGIN; i < RAM_POT_STATE_ADDRESS_END; ++i) {
+ 		clock.writeRAMbyte(i, 0);
+ 	}//for i
 
 	int watering_plants = 0;
-	water_doser.prepareWatering();
+// 	water_doser.prepareWatering();
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		int8_t ret = check_pot_state(i, true);
 		if (ret < 0) continue;
@@ -101,16 +64,25 @@ int WateringController::run_checks()
 
 void WateringController::doPotService(bool check_and_watering)
 {
-	uint8_t sw = run_checks();
-	if (log) {
-		log->print("sw = ");
-		log->println(sw, DEC);
+	uint8_t state = clock.readRAMbyte(RAM_CUR_STATE);
+	uint8_t sw;
+	if (state == CUR_STATE_IDLE) {
+		sw = run_checks();
+		if (log) {
+			log->print("sw = ");
+			log->println(sw, DEC);
+		}
 	}
-	if (sw > 0 && check_and_watering) {
-		delay(5000);
-		log->print("\b");
+	if (check_and_watering) {
 		run_watering();
 	}
+	DateTime now = clock.now();
+	last_check_time = now.secondstime();
+	clock.writeRAMbyte(LAST_CHECK_TS_1, last_check_time >> 24);
+	clock.writeRAMbyte(LAST_CHECK_TS_2, last_check_time >> 16);
+	clock.writeRAMbyte(LAST_CHECK_TS_3, last_check_time >> 8);
+	clock.writeRAMbyte(LAST_CHECK_TS_4, last_check_time & 0xFF);
+	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 	log->println("watering end");
 }
 
@@ -138,7 +110,11 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 
 	uint16_t val = i2cexp->read_pin(pot.sensor.dev_addr, pot.sensor.pin);
 	bool should_water = check_watering_program(index, pot, val);
-
+	if (should_water) {
+		uint8_t was = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + index/8);
+		was |= (1<<(index%8));
+		clock.writeRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + index/8, was);
+	}
 // 	if (log) {
 // // 		log->print("sensor:");
 // 		log->print(val, DEC);
@@ -255,109 +231,28 @@ void WateringController::write_watering_program(uint8_t pot_index, wateringProgr
 	g_cfg.write_watering_program(pot_index, wpgm);
 }
 
-void WateringController::__processData(int8_t* pots, int8_t sz)
-{
-	int8_t water_pots[ POTS_AT_ONCE ] = {-1};
-	potConfig pc;
-//  	Serial1.println("__processData");
-//! 	water_doser.rewind(-1);
-//  	Serial1.println("__processData 2");
-	//16 горшков превратить в 16 чашек +
-	//сортировка по возрастанию. +
-	// полить каждую.
-	//сбросить массив в изначальное состояние.
-	for (int index = 0; index < sz; ++index) {
-		if (pots[ index ] < 0) continue;
-		pc = g_cfg.readPot(pots[ index ]);
-//  		Serial1.print(index, DEC);
-//  		Serial1.print(": ");
-//  		Serial1.println(pc.wc.y, DEC);
-		water_pots[ index ] = (pc.wc.y << 4) | (pc.wc.x);
-	}
-
-	this->__sort(water_pots, pots, sz);
-
-// 	Stat stat;
-
-	for (int index = 0; index < sz; ++index) {
-		if (pots[ index ] < 0) continue;
-//  		Serial1.print("water to pot ");
-//  		Serial1.print(pots[ index ], DEC);
-		pc = g_cfg.readPot(pots[ index ]);
-		if (log) {
-// 			log->print("watering ");
-			log->println(pc.name);
-			log->print(pc.wc.x, DEC);
-			log->print(" ");
-			log->print(pc.wc.y, DEC);
-			log->print(" ");
-			log->println(pc.wc.ml, DEC);
-		}
- 		Serial1.println(pc.name);
-		water_doser.init_measure();
-		Serial1.print(pc.wc.x, DEC);
-		Serial1.print(" ");
-		Serial1.print(pc.wc.y, DEC);
-		Serial1.print(" ");
-		Serial1.println(pc.wc.ml, DEC);
-
-// 		if (water_doser.moveToPos(pc.wc.x, pc.wc.y)) {
-			uint16_t ml = water_doser.pipi(pc.wc.x, pc.wc.y, pc.wc.ml);
-			if (log) {
-				Serial1.print("watered: ");
-				Serial1.println(ml, DEC);
-
-				log->print("watered: ");
-				log->println(ml, DEC);
-			}
-			pc.wc.watered += ml;
-			g_cfg.savePot(pots[ index ], pc);
-
-// 			StatFile*file = stat.open(pots[ index ]);
-// 			stat.saveMlValue(file, ml);
-// 			stat.close(file);
-
-// 			g_cfg.day_stat_save_ml(pots[ index ], ml);
-
-// 		} else {
-// 			Serial1.println("ERROR: can not move to bowl");
-// 		}
-	}
-}//sub
-
-
 void WateringController::run_watering()
 {
 	uint8_t data = 0;
-	int8_t pots[ POTS_AT_ONCE ] = {-1}, di = 0;
-	water_doser.prepareWatering();
-	for(int i = 0; i < 10; ++i) {
-		data = pot_states[i];
+	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_WATER);
+// 	water_doser.prepareWatering();
+	uint8_t i = 0;
+	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr) {
+		data = clock.readRAMbyte(addr);
 // 		Serial1.print("read byte ");
 // 		Serial1.print(i, DEC);
 // 		Serial1.print(" ");
 // 		Serial1.println(data, DEC);
 		int j = 0;
-		while (data) {
-			if (data & 1) {
-// 				Serial1.print("plant #");
-// 				Serial1.println( (i - DS1307_POT_STATE_ADDRESS_BEGIN) * 8 + j, DEC);
-				pots[ di++ ] = i * 8 + j;
-				if (POTS_AT_ONCE == di) {
-// 					Serial1.println("data is full.watering");
-					__processData(pots, di);
-					memset(pots, -1, sizeof(pots));
-					di = 0;
-				}//if POTS_AT_ONCE filled
+		for (j = 0; j < 8; ++j) {
+			if (data & (1<<j)) {
+				potConfig pc = g_cfg.readPot( i * 8 + j);
+				uint16_t ml = water_doser.pipi(pc.wc.x, pc.wc.y, pc.wc.ml);
+				data &= ~(1<<j);
+				clock.writeRAMbyte(addr, data);
 			}//if needs watering
-			data >>= 1;
-			++j;
 		}
-	}
-//  	Serial1.print("di at end:");
-//  	Serial1.println(di, DEC);
-	if (di) {
-		__processData(pots, di);
+		++i;
 	}
 }
 

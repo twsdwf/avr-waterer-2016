@@ -7,8 +7,6 @@ class WateringController{
 protected:
 	uint8_t pot_states[10];
 	I2CExpander*i2cexp;
-	void __sort(int8_t* dosers, int8_t* pots, int8_t sz);
-	void __processData(int8_t* pots, int8_t sz);
 	Print*log;
 public:
 	void setLog(Print*_log);

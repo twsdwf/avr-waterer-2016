@@ -51,11 +51,11 @@ public:
 	WaterDoserSystem();
 	~WaterDoserSystem();
 	void begin(/*uint8_t _expander_addr, I2CExpander*exp*/	);
-	bool init_measure(/*uint8_t doser_index*/);
+// 	bool init_measure(/*uint8_t doser_index*/);
 	uint16_t measure(uint16_t ml, uint16_t timeout = 8000);
 	void haltPumps();
 	bool moveToPos(uint8_t, uint8_t);
-	void prepareWatering();
+// 	void prepareWatering();
 	void _doser_halt();
 	uint16_t pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at=atMedium);
 	void resetDefaults();

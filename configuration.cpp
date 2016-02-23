@@ -112,7 +112,7 @@ bool Configuration::writeWaterStorageData(WaterStorageData*wsd, uint8_t index)
 bool Configuration::readGlobalConfig()
 {
 	uint8_t buffer[32] = {0};
-	mem.readBuffer(0, (char*)buffer, 32);
+	mem.readBuffer(GCFG_ADDRESS, (char*)buffer, 32);
 	if (buffer[0] != CONFIG_MAGIC) {
  		Serial1.println("wrong magic num");
 		return false;
@@ -126,10 +126,11 @@ bool Configuration::readGlobalConfig()
 
 bool Configuration::writeGlobalConfig()
 {
-	uint8_t buffer[512] = {0};
+	uint8_t buffer[32] = {0};
 	buffer[ 0 ] = CONFIG_MAGIC;
 	buffer[ 1 ] = CONFIG_VERSION;
 	memcpy(buffer + 2, &this->config, sizeof(globalConfig));
+	mem.writeBuffer(GCFG_ADDRESS, (char*)buffer, 32);
 // 	mmc::writeSector(buffer, 0);
 // 	mmc::writeSector(buffer, SECOND_COPY_START);
 	return true;
@@ -340,4 +341,4 @@ void Configuration::midnight_tasks()
 }
 
 Configuration g_cfg;
-
+char*str=(char*)malloc(80);

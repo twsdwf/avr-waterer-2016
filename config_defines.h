@@ -19,6 +19,8 @@ PAGE		content
 #define CONFIG_MAGIC		0x55
 #define CONFIG_VERSION		0x33
 
+#define GCFG_ADDRESS		32
+
 #define MAX_POTS			80
 // #define EXPANDERS_START_PAGE		2
 #ifdef MY_ROOM
@@ -65,32 +67,31 @@ PAGE		content
 // #define PUMP_HC595_LATCH	(21)
 // #define PUMP_HC595_DATA		(22)
 // #define PUMP_HC595_CLOCK	(20)
-
+/*
 #define ERRLOG_CNT_BYTE_LO	24
 #define ERRLOG_CNT_BYTE_HI	25
 
 #define ERRLOG_TAIL_BYTE_1 26
 #define ERRLOG_TAIL_BYTE_2 27
 #define ERRLOG_TAIL_BYTE_3 28
-#define ERRLOG_TAIL_BYTE_4 29
+#define ERRLOG_TAIL_BYTE_4 29*/
 
-#define LAST_CHECK_TS_1		31
-#define LAST_CHECK_TS_2		32
-#define LAST_CHECK_TS_3		33
-#define LAST_CHECK_TS_4		34
+#define RAM_CUR_STATE			(8)
+#define CUR_STATE_IDLE			(0)
+#define CUR_STATE_READ			(1)
+#define CUR_STATE_WATER			(2)
 
-#define DS1307_POT_STATE_ADDRESS_BEGIN		(10)
-#define DS1307_POT_STATE_ADDRESS_END		(20)
+#define LAST_CHECK_TS_1		9
+#define LAST_CHECK_TS_2		10
+#define LAST_CHECK_TS_3		11
+#define LAST_CHECK_TS_4		12
 
+#define RAM_POT_STATE_ADDRESS_BEGIN		(13)
+#define RAM_POT_STATE_ADDRESS_END		(RAM_POT_STATE_ADDRESS_BEGIN + 4)
+#define RAM_WATER_STATS_BEGIN			(RAM_POT_STATE_ADDRESS_BEGIN + 5)
 // #define USE_OLD_WATERING_DRIVER
 
 // #define		USE_1WIRE
 
-#ifdef USE_1WIRE
-	#define ONE_WIRE_PIN	(12)
-	#define MAX_DS18B20_SENSORS 2
-	#define INDOOR_TERMO	1
-	#define OUTDOOR_TERMO	0
-#endif
 #include "messages_en.h"
 #endif

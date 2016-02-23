@@ -82,7 +82,7 @@ int AT24Cxxx::readBuffer(int start, char*buf, int length)
 		}
 	} else {
 		for (int i = 0; i < length; ++i, ++start) {
-			*ptr++ = read(start);
+			*ptr++ = this->read(start);
 		}
 	}
 // 	for (int i = 0; i < length; ++i, ++start) {

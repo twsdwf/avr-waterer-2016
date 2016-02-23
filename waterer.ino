@@ -2,11 +2,11 @@
 /*
  * надо сделать:
  = насос,счётчик жидкости
- = опрос датчиков
- = конфиг полива(растения,горки,датчики,х,у,итд)
+ = опрос датчиков		+
+ = конфиг полива(растения,горшки,датчики,х,у,итд)
  = полив по программам
-
  */
+
 #define TWI_BUFFER_LENGTH	16
 #define BUFFER_LENGTH		16
 
@@ -31,7 +31,7 @@
 #include "configuration.h"
 #include "waterdosersystem.h"
 #include "i2cexpander.h"
-// #include "wateringcontroller.h"
+#include "wateringcontroller.h"
 // #include "waterstorage.h"
 
 extern "C" {
@@ -56,7 +56,7 @@ extern Configuration g_cfg;
 extern WaterDoserSystem water_doser;
 
 I2CExpander i2cExpander;
-// WateringController wctl;
+WateringController wctl;
 
 int8_t iForceWatering = 0;
 
@@ -133,7 +133,9 @@ void dumpPotConfig(uint8_t index)
 
 void printGcfg()
 {
-	uint16_t val = (uint16_t)g_cfg.config.flags;
+	uint16_t val = (uint16_t)g_cfg.config.enabled;
+	print_field<uint16_t>(val);
+	val = (uint16_t)g_cfg.config.flags;
 	print_field<uint16_t>(val);
 	print_field<uint8_t>(g_cfg.config.pots_count);
 	print_field<uint16_t>(g_cfg.config.i2c_pwron_timeout);
@@ -172,23 +174,24 @@ bool doCommand(char*cmd)
 		water_doser.moveToPos(x, y);
 	} else if (IS(cmd, "iic", 3)) {
 		i2cExpander.i2c_on();
-		if (IS(cmd+4,"scan",4)) {
-			uint8_t addr = 0;
-			while (i2cExpander.findNext(PCF8574_ADDRESS, PCF8574_ADDRESS+8,&addr)) {
+		if (IS(cmd + 4, "scan", 4)) {
+			uint8_t addr = PCF8574_ADDRESS;
+			while (i2cExpander.findNext(addr, PCF8574_ADDRESS+8, &addr)) {
 				Serial1.print(addr,DEC);
 				Serial1.print(",");
+				++addr;
 			}
-			Serial.println("0;");
+			Serial1.println("0;");
 		} else if (isdigit(*(cmd+4))) {
 			int dev=-1,pin=-1;
 			char *ptr = cmd + 4;
 			set_field<int>(dev, &ptr);
 			set_field<int>(pin, &ptr);
-			Serial.print(dev, DEC);
+			Serial1.print(dev, DEC);
 			Serial1.print(",");
-			Serial.print(pin, DEC);
+			Serial1.print(pin, DEC);
 			Serial1.print(",");
-			Serial.print(i2cExpander.read_pin(dev,pin), DEC);
+			Serial1.print(i2cExpander.read_pin(dev,pin), DEC);
 			Serial1.println(";");
 		}
 		i2cExpander.i2c_off();
@@ -274,10 +277,12 @@ typedef struct wateringConfig{
 			set_field<uint16_t>(g_cfg.config.sensor_init_time, &ptr);
 			set_field<uint16_t>(g_cfg.config.sensor_read_time, &ptr);
 			set_field<uint16_t>(g_cfg.config.water_start_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_start_time, &ptr);
+			set_field<uint16_t>(g_cfg.config.water_end_time, &ptr);
+			set_field<uint16_t>(g_cfg.config.water_start_time_we, &ptr);
 			set_field<uint16_t>(g_cfg.config.water_end_time_we, &ptr);
 			set_field<uint8_t>(g_cfg.config.sensor_measures, &ptr);
 			g_cfg.writeGlobalConfig();
+			printGcfg();
 			g_cfg.readGlobalConfig();
 			printGcfg();
 		}
@@ -337,11 +342,25 @@ void setup()
 	Serial1.println("HELLO");
 	Wire.begin();
  	clock.begin();
-	
-//  	g_cfg.begin();
+	for (uint8_t i = 8; i <0x3F; ++i) {
+		clock.writeRAMbyte(i, 0xAA);
+		delay(10);
+		if (clock.readRAMbyte(i)!=0xAA) {
+			Serial1.print("error AA at ");
+			Serial1.println(i);
+		}
+		clock.writeRAMbyte(i, 0x55);
+		delay(10);
+		if (clock.readRAMbyte(i)!=0x55) {
+			Serial1.print("error 55 at ");
+			Serial1.println(i);
+		}
+	}
+  	g_cfg.begin();
+	g_cfg.readGlobalConfig();
    	water_doser.begin();
-// 	wctl.init(&i2cExpander);
-// 	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
+ 	wctl.init(&i2cExpander);
+ 	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
 }
 
 /**
@@ -376,13 +395,8 @@ void loop()
 
 		if ((now.secondstime() - last_check_time > 30 * 60) || iForceWatering) {
 
-// 			wctl.doPotService(iForceWatering != 1);
+ 			wctl.doPotService(iForceWatering != 1);
 
-			last_check_time = now.secondstime();
-			clock.writeRAMbyte(LAST_CHECK_TS_1, last_check_time >> 24);
-			clock.writeRAMbyte(LAST_CHECK_TS_2, last_check_time >> 16);
-			clock.writeRAMbyte(LAST_CHECK_TS_3, last_check_time >> 8);
-			clock.writeRAMbyte(LAST_CHECK_TS_4, last_check_time & 0xFF);
 			iForceWatering = 0;
 		}
 	} else if (now_m < 2 && !midnight_skip) {//midnight
