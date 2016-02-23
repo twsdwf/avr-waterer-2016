@@ -10,10 +10,11 @@
 
 extern RTC_DS1307 clock;
 // static char wrong_magic[] PROGMEM = "bad magic!";
+extern AT24Cxxx mem;
 
 Configuration::Configuration()
 {
-	memset(&this->gcfg, 0, sizeof(gcfg));
+	memset(&this->config, 0, sizeof(config));
 }
 
 Configuration::~Configuration()
@@ -110,21 +111,15 @@ bool Configuration::writeWaterStorageData(WaterStorageData*wsd, uint8_t index)
 
 bool Configuration::readGlobalConfig()
 {
-// 	File cfg = SD.open("config.cfg");
-// 	cfg.seek(0);
-	uint8_t buffer[512] = {0};
-// 	mmc::readSector(buffer, 0);
-//  	Serial1.print("magic:");
-//  	Serial1.println(buffer[0], DEC);
+	uint8_t buffer[32] = {0};
+	mem.readBuffer(0, (char*)buffer, 32);
 	if (buffer[0] != CONFIG_MAGIC) {
-// 		EXTRACT_STRING(buffer, wrong_magic);
  		Serial1.println("wrong magic num");
 		return false;
 	}
-// 	magic = mem->read(1);
-	memcpy(&this->gcfg, buffer + 2, sizeof(globalConfig));
-	if (this->gcfg.pots_count >= MAX_POTS) {
-		this->gcfg.pots_count = 0;
+	memcpy(&this->config, buffer + 2, sizeof(globalConfig));
+	if (this->config.pots_count >= MAX_POTS) {
+		this->config.pots_count = 0;
 	}
 	return true;
 }
@@ -133,7 +128,8 @@ bool Configuration::writeGlobalConfig()
 {
 	uint8_t buffer[512] = {0};
 	buffer[ 0 ] = CONFIG_MAGIC;
-	memcpy(buffer + 2, &this->gcfg, sizeof(globalConfig));
+	buffer[ 1 ] = CONFIG_VERSION;
+	memcpy(buffer + 2, &this->config, sizeof(globalConfig));
 // 	mmc::writeSector(buffer, 0);
 // 	mmc::writeSector(buffer, SECOND_COPY_START);
 	return true;
@@ -149,13 +145,7 @@ potConfig Configuration::readPot(uint8_t index)
 		Serial1.println(" out of bounds");
 		return pc;
 	}
-// 	Serial1.println("prepare sector read");Serial1.flush();
-//  	uint8_t buffer[512]={0};
-//  	mmc::readSector(buffer, POTS_START_ADDRESS + index);
-// 	mmc::readBufferEx((uint8_t*)&pc, sizeof(potConfig), POTS_START_ADDRESS + index, 0);
-// Serial1.println("sector read ok");Serial1.flush();
-//  	memcpy(&pc, buffer, sizeof(potConfig));
-// 	Serial1.println("data copied ok");Serial1.flush();
+	mem.readBuffer(POTS_DATA_PAGE0 + MEM_PAGE_SIZE * index, (char*)&pc, sizeof(pc));
 	pc.name[POT_NAME_LENGTH - 1] = 0;
 	return pc;
 }
@@ -168,19 +158,7 @@ bool Configuration::savePot(uint8_t index, potConfig& pc)
 		Serial1.println(" out of bounds");
 		return false;
 	}
-	uint8_t buffer[512]={0};
-	memcpy(buffer, &pc, sizeof(potConfig));
-// 	mmc::writeSector(buffer, POTS_START_ADDRESS + index);
-// 	mmc::writeSector(buffer, SECOND_COPY_START + POTS_START_ADDRESS + index);
-// 	uint16_t addr = POTS_START_ADDRESS + index * sizeof(potConfig);
-// 	File cfg = SD.open("config.cfg", O_WRITE);
-// 	cfg.seek(addr);
-// 	cfg.write((const uint8_t*)&pc,  sizeof(potConfig));
-// 	cfg.close();
-
-#if 0
-	mem->writeBuffer(addr, (char*)&pc, sizeof(potConfig));
-#endif
+	mem.writeBuffer(POTS_DATA_PAGE0 + MEM_PAGE_SIZE * index, (char*)&pc, sizeof(potConfig));
 	return true;
 }
 

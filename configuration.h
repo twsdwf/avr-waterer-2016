@@ -3,7 +3,7 @@
 
 #include "awtypes.h"
 #include "RTClib.h"
-// #include <AT24Cxxx.h>
+#include <AT24Cxxx.h>
 // #include <SD.h>
 
 ///TODO: make double-write logic and third midnight backup
@@ -11,7 +11,7 @@
 class Configuration{
 protected:
 public:
-	globalConfig gcfg;
+	globalConfig config;
 	Configuration();
 	virtual ~Configuration();
 	void begin();

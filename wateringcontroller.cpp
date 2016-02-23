@@ -90,7 +90,7 @@ int WateringController::run_checks()
 
 	int watering_plants = 0;
 	water_doser.prepareWatering();
-	for (int i = 0; i < g_cfg.gcfg.pots_count; ++i) {
+	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		int8_t ret = check_pot_state(i, true);
 		if (ret < 0) continue;
 			watering_plants += ret;
@@ -365,7 +365,7 @@ void WateringController::midnightTasks()
 {
 	potConfig pc;
 // 	wateringProgram wp;
-	for (int i = 0; i < g_cfg.gcfg.pots_count; ++i) {
+	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		pc = g_cfg.readPot(i);
 		uint8_t pgm = pc.wc.pgm_id;
 		if (pgm == 1 || pgm == 2) {

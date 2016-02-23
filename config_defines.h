@@ -21,7 +21,10 @@ PAGE		content
 
 #define MAX_POTS			80
 // #define EXPANDERS_START_PAGE		2
-
+#ifdef MY_ROOM
+	#define	WD_SIZE_X	3
+	#define WD_SIZE_Y	9
+#endif
 // #define WATER_STORAGE_PAGE				11
 
 #define WFC_PAGE					 	1

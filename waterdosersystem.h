@@ -38,12 +38,12 @@ protected:
 	void fwdY();
 	void stopX();
 	void stopY();
-	bool parkX();
-	bool parkY();
 	bool nextX();
 	bool nextY();
 	void dope(AirTime at=atMedium);
 public:
+	bool parkX();
+	bool parkY();
 	void servoUp();
 	void servoDown();
 	void servoUnbind();

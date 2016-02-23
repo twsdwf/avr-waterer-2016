@@ -50,8 +50,8 @@ bool I2CExpander::i2c_on()
 	DDRE |= (1<<I2C_EXPANDERS_EN_PIN);
 	I2C_EXPANDERS_EN_PORT |= (1<<I2C_EXPANDERS_EN_PIN);
 // 	Serial1.print("on. wait ");
-// 	Serial1.println(g_cfg.gcfg.i2c_pwron_timeout, DEC);
-	delay(g_cfg.gcfg.i2c_pwron_timeout);
+// 	Serial1.println(g_cfg.config.i2c_pwron_timeout, DEC);
+	delay(g_cfg.config.i2c_pwron_timeout);
 	this->i2c_is_on = true;
 // 	Serial1.println("Wire::begin();");
 // 	Serial1.flush();
@@ -97,7 +97,7 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 	}
 		this->begin(addr);
 		this->write(pin, HIGH);
-		delay(g_cfg.gcfg.sensor_init_time);
+		delay(g_cfg.config.sensor_init_time);
 
 		pinMode(4, INPUT);
 		digitalWrite(4, HIGH);
@@ -109,7 +109,7 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 		this->write(PCF_PIN_D, pin & 8);
 		this->write(PCF_PIN_INH, LOW);
 		
-		delay(g_cfg.gcfg.sensor_read_time);
+		delay(g_cfg.config.sensor_read_time);
 
 		n = analogRead(AIN_PIN);
 		
