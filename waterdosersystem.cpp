@@ -40,7 +40,8 @@
 #define X_STEP_PIN			(31)
 #define Y_STEP_PIN			(30)
 
-
+#define Z_AXE_EN			(36)
+#define Z_AXE_DIR			(35)
 /*
  *
 typedef struct WaterDoserSystemConfig{
@@ -143,33 +144,64 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	
 	cur_x = 0xFF;
 	cur_y = 0xFF;
-	
-	Serial1.println("tests ended");
-	servoUp();
-	delay(1000);
-	servoUnbind();
-    	parkX();
-    	parkY();
- 	this->pipi(1,8,10);
-	this->pipi(1,8,10);
-	this->pipi(1,8,10);
+	pinMode(Z_AXE_DIR, OUTPUT);
+	pinMode(Z_AXE_EN, OUTPUT);
+
+// 	while(true) {
+// 		testES();
+// 		delay(1000);
+// 	}
+// 	Serial1.println("tests ended");
+ 	servoUp();
+// 	delay(1000);
+// 	servoUnbind();
+     	parkX();
+     	parkY();
+//  	this->pipi(1,8,10);
+// 	this->pipi(1,8,10);
+// 	this->pipi(1,8,10);
+}
+
+void WaterDoserSystem::testAll()
+{
+	for (uint8_t x = 0; x < WD_SIZE_X; ++x) {
+		for (uint8_t y = 0; y < WD_SIZE_Y; ++y) {
+			Serial1.print(x, DEC);
+			Serial1.print(" ");
+			Serial1.println(y, DEC);
+			moveToPos(x,y);
+			servoDown();
+			delay(500);
+			servoUp();
+// 			delay(500);
+		}
+	}
 }
 
 void WaterDoserSystem::servoUp()
 {
-	srv.attach(SERVO_PIN);
-	srv.write(100);
+	pinMode(Z_AXE_DIR, OUTPUT);
+	pinMode(Z_AXE_EN, OUTPUT);
+	digitalWrite(Z_AXE_EN, HIGH);
+	digitalWrite(Z_AXE_DIR, LOW);//UP
+	while (analogRead(6) < 200);
+	digitalWrite(Z_AXE_DIR, LOW);
+	digitalWrite(Z_AXE_EN, LOW);
 }
 
 void WaterDoserSystem::servoDown()
 {
-	srv.attach(SERVO_PIN);
-	srv.write(0);
+	pinMode(Z_AXE_DIR, OUTPUT);
+	pinMode(Z_AXE_EN, OUTPUT);
+	digitalWrite(Z_AXE_EN, HIGH);
+	digitalWrite(Z_AXE_DIR, HIGH);
+	delay(1000);
+// 	digitalWrite(Z_AXE_EN, LOW);
 }
 
 void WaterDoserSystem::servoUnbind()
 {
-	srv.detach();
+	digitalWrite(Z_AXE_EN, LOW);
 }
 	
 bool WaterDoserSystem::nextX()
@@ -338,7 +370,7 @@ void WaterDoserSystem::testES()
 {
 	Serial1.print("X begin=");
 	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
-	/*Serial1.print("X end=");
+	Serial1.print("X end=");
 	Serial1.println(analogRead(X_END_PIN), DEC);
 	Serial1.print("X stepper=");
 	Serial1.println(digitalRead(X_STEP_PIN), DEC);
@@ -348,7 +380,11 @@ void WaterDoserSystem::testES()
 	Serial1.print("Y end=");
 	Serial1.println(analogRead(Y_END_PIN), DEC);
 	Serial1.print("Y stepper=");
-	Serial1.println(digitalRead(Y_STEP_PIN), DEC);*/
+	Serial1.println(digitalRead(Y_STEP_PIN), DEC);
+
+	Serial1.print("Z begin=");
+	Serial1.println(analogRead(6), DEC);
+
 }
 
 bool WaterDoserSystem::parkX()
@@ -364,6 +400,7 @@ bool WaterDoserSystem::parkX()
 		bwdX();
 	}
 	stopX();
+	cur_x = -1;
 }
 
 bool WaterDoserSystem::parkY()
@@ -376,30 +413,50 @@ bool WaterDoserSystem::parkY()
 		bwdY();
 	}
 	stopY();
+	cur_y = -1;
 }
 
 bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 {
+	Serial1.print("cur pos (");
+	Serial1.print(cur_x, DEC);
+	Serial1.print(",");
+	Serial1.print(cur_y);
+	Serial1.println(")");
+
+	Serial1.print("new pos (");
+	Serial1.print(x, DEC);
+	Serial1.print(",");
+	Serial1.print(y);
+	Serial1.println(")");
+	
 	if (x < cur_x) {
+		Serial1.println("park X before move");
 		parkX();
 		nextX();
 	}
 	if (y < cur_y) {
+		Serial1.println("park Y before move");
 		parkY();
 		nextY();
+		Serial1.print("cur_y=");
+		Serial1.println(cur_y);
 	}
-	while(cur_x < x) {
+	
+	while (cur_x < x) {
 		if (!nextX()) {
 			Serial1.println("ERROR in X-pos");
 			return false;
 		}
 	}
+	
 	while(cur_y < y) {
 		if (!nextY()) {
 			Serial1.println("ERROR in Y-pos");
 			return false;
 		}
 	}
+	Serial1.println("done");
 	return true;
 }
 

@@ -259,10 +259,10 @@ template<typename field_type> bool set_field(field_type& field, char**ptr)
 		++(*ptr);
 	}
 	if (ok) {
-		Serial1.println("field is ok");
+// 		Serial1.println("field is ok");
 		field = val;
 	} else {
-		Serial1.println("field read error");
+// 		Serial1.println("field read error");
 	}
 	++*ptr;
 	return ok;

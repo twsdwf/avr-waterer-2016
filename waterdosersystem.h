@@ -48,6 +48,7 @@ public:
 	void servoDown();
 	void servoUnbind();
 	void testES();
+	void testAll();
 	WaterDoserSystem();
 	~WaterDoserSystem();
 	void begin(/*uint8_t _expander_addr, I2CExpander*exp*/	);

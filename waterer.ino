@@ -150,7 +150,26 @@ void printGcfg()
 bool doCommand(char*cmd)
 {
 	static const char time_read_fmt[] /*PROGMEM*/ = "%d:%d:%d %d.%d.%d %d";
-	if (IS(cmd, "WSZ", 3)) {
+	if (IS(cmd, "+", 1)) {
+		int pin = atoi(cmd+1);
+		if(pin > 2) {
+			pinMode(pin, OUTPUT);
+			digitalWrite(pin, HIGH);
+		}
+	} else if(IS(cmd,"-",1)) {
+		int pin = atoi(cmd+1);
+		if(pin > 2) {
+			pinMode(pin, OUTPUT);
+			digitalWrite(pin, LOW);
+		}		
+	} else if (IS(cmd, "pipi", 4)) {
+		uint8_t x=0xFF, y=0xFF, ml=0xFF;
+		char*ptr = cmd+5;
+		set_field<uint8_t>(x, &ptr);
+		set_field<uint8_t>(y, &ptr);
+		set_field<uint8_t>(ml, &ptr);
+		water_doser.pipi(x,y,ml, atMedium);
+	} else if (IS(cmd, "WSZ", 3)) {
 		Serial1.print(WD_SIZE_X);
 		Serial1.print(",");
 		Serial1.println(WD_SIZE_Y);
@@ -160,6 +179,10 @@ bool doCommand(char*cmd)
 		water_doser.servoDown();
 	} else if (IS("G",cmd,1)) {
 		char *ptr = cmd + 1;
+		if (cmd[1] == 'A') {
+			water_doser.testAll();
+			return true;
+		}
 		if (*ptr == '!') {
 			water_doser.parkX();
 			water_doser.parkY();
@@ -314,13 +337,12 @@ void checkCommand()
 	static char cmdbuf[64]={0}, ch;
 	while (Serial1.available()) {
 		ch = Serial1.read();
-		if(ch == 7) {
-			i=0;
-			continue;
-		}
-		if (ch ==10 || ch ==13) {
+		if (ch ==10 || ch ==13 ||ch == ';') {
 			if ( i == 0 ) continue;
 			cmdbuf[ i ] = 0;
+			Serial1.print("cmd=[");
+			Serial1.print(cmdbuf);
+			Serial1.println("]");
 			doCommand(cmdbuf);
 			i = 0;
 		} else {
