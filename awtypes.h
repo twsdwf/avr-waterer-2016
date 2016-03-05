@@ -99,20 +99,20 @@ struct coords{
 typedef struct wateringConfig{
 	uint8_t	x:3;
 	uint8_t y:5;
-	uint8_t pgm_id:4;
+	uint8_t pgm:4;
 	uint8_t airTime:2;
 	uint8_t state:1;
 	uint8_t enabled:1;
- 	uint8_t flags;
+//  	uint8_t flags;
 	uint8_t	ml;
 	uint16_t watered;
 }wateringConfig;//6 bytes
 
 typedef struct sensorConfig
 {
-	uint8_t dev_addr;
+	uint8_t dev;
  	uint8_t pin;
-	uint8_t flags;
+// 	uint8_t flags;
 	uint8_t noise_delta;
 } sensorConfig; //4
 
@@ -228,8 +228,9 @@ typedef struct globalConfig{
 	uint16_t water_start_time_we;
 	uint16_t water_end_time_we;
 	uint8_t sensor_measures;
+	uint8_t test_interval;
 // 	uint8_t lcd_highlight_value;
-}globalConfig;//18 bytes
+}globalConfig;//19 bytes
 
 extern HardwareSerial Serial1;
 // extern Configuration g_cfg;
@@ -242,7 +243,7 @@ inline void get_h_m_from_timefield(uint16_t& time, uint8_t&h, uint8_t&m)
 }
 
 
-template<typename field_type> void print_field(field_type& field, char terminator=',')
+template<typename field_type> void print_field(field_type field, char terminator=',')
 {
 	Serial1.print(field);
 	Serial1.print(terminator);
@@ -259,10 +260,11 @@ template<typename field_type> bool set_field(field_type& field, char**ptr)
 		++(*ptr);
 	}
 	if (ok) {
-// 		Serial1.println("field is ok");
+//  		Serial1.print("field is ok.value=");
+// 		Serial1.println(val);
 		field = val;
 	} else {
-// 		Serial1.println("field read error");
+//  		Serial1.println("field read error");
 	}
 	++*ptr;
 	return ok;

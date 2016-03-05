@@ -45,7 +45,7 @@ PAGE		content
 
 // #define MEM_PROG_PROGS_START	65
 
-#define POT_NAME_LENGTH		(16)
+#define POT_NAME_LENGTH		(18)
 
 #define I2C_EXPANDERS_DDR		DDRE
 #define I2C_EXPANDERS_EN_PORT	PORTE
