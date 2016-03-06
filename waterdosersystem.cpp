@@ -440,18 +440,151 @@ bool WaterDoserSystem::parkY()
 
 bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 {
-// 	Serial1.print("cur pos (");
-// 	Serial1.print(cur_x, DEC);
+/*
+	Serial1.print("cur pos (");
+	Serial1.print(cur_x, DEC);
+	Serial1.print(",");
+	Serial1.print(cur_y);
+	Serial1.println(")");
+
+	Serial1.print("new pos (");
+	Serial1.print(x, DEC);
+	Serial1.print(",");
+	Serial1.print(y);
+	Serial1.println(")");
+//*/
+	uint8_t xs=0, ys=0;
+	/*
+		0 - stop
+		1 - park
+		2 - move
+	 */
+	if (x < cur_x) {
+// 		Serial1.println("should park X");
+		xs = 1;
+		bwdX();
+	} else if( cur_x < x){
+// 		Serial1.println("should move X");
+		xs = (digitalRead(X_STEP_PIN)==HIGH ? 3 : 2);
+		fwdX();
+	}
+	if (y < cur_y) {
+// 		Serial1.println("should park Y");
+		ys = 1;
+		bwdY();
+	} else if (cur_y < y) {
+		ys = (digitalRead(Y_STEP_PIN)==HIGH ? 3 : 2);
+		fwdY();
+// 		Serial1.println("should move Y");
+	}
+	uint32_t x_ms=millis(), y_ms=millis();
+	while (xs || ys) {
+		if (xs == 1) {
+			if (HIGH == digitalRead(X_BEGIN_PIN)) {
+// 				Serial1.println("x parked. move fwd");
+				stopX();
+				fwdX();
+				x_ms = millis();
+				xs = 2;
+				cur_x = -1;
+			}
+		} else if (xs == 2) {//wait low state.
+			if (digitalRead(X_STEP_PIN) == LOW) {
+				xs = 3;
+			}
+		} else if(xs == 3) {//wait HIGH
+			if (cur_x == -1) {
+				if (digitalRead(X_STEP_PIN) && digitalRead(X_STEP_PIN) ) {
+					++cur_x;
+// 					Serial1.print("at x#1:");
+// 					Serial1.println(cur_x, DEC);
+					xs = ((cur_x < x) ? 2 : 0);
+// 					Serial1.print("xs=");
+// 					Serial1.println(xs, DEC);
+					x_ms = millis();
+				}
+				
+				if (xs == 0) {
+// 					Serial1.print("finished x#1 at ");
+// 					Serial1.println(cur_x, DEC);
+					stopX();
+				}
+			} else {
+// 				while (true) {
+				if (digitalRead(X_STEP_PIN) == HIGH) {
+					if (millis() - x_ms > 1000) {
+						++cur_x;
+// 						Serial1.print("at x#2:");
+// 						Serial1.println(cur_x, DEC);
+						x_ms = millis();
+						xs = ((cur_x < x) ? 2 : 0);
+					}
+				}//if step=high
+				if (xs == 0) {
+// 					Serial1.print("finished x#2 at ");
+// 					Serial1.println(cur_x, DEC);					
+					stopX();
+				}//is xs == 0
+			}//else if cur_x > -1
+		}//is xs == 2
+
+		if (ys == 1) {
+			if (LOW == digitalRead(Y_BEGIN_PIN)) {
+// 				Serial1.println("y parked. move fwd");
+				stopY();
+				fwdY();
+				y_ms = millis();
+				ys = 2;
+				cur_y = -1;
+			}
+		} else if (ys == 2) {//wait low state.
+			if (digitalRead(Y_STEP_PIN) == LOW) {
+				ys = 3;
+			}
+		} else if(ys == 3) {//wait HIGH
+			if (cur_y == -1) {
+				if (digitalRead(Y_STEP_PIN) && digitalRead(Y_STEP_PIN) ) {
+					++cur_y;
+// 					Serial1.print("at y#1:");
+// 					Serial1.println(cur_y, DEC);
+					ys = ((cur_y < y) ? 2 : 0);
+// 					Serial1.print("ys=");
+// 					Serial1.println(ys, DEC);
+					y_ms = millis();
+				}
+
+				if (ys == 0) {
+// 					Serial1.print("finished y#1 at ");
+// 					Serial1.println(cur_y, DEC);
+					stopY();
+				}
+			} else {
+// 				while (true) {
+				if (digitalRead(Y_STEP_PIN) == HIGH) {
+					if (millis() - y_ms > 1000) {
+						++cur_y;
+// 						Serial1.print("at y#2:");
+// 						Serial1.println(cur_y, DEC);
+						y_ms = millis();
+						ys = ((cur_y < y) ? 2 : 0);
+					}
+				}//if step=high
+				if (ys == 0) {
+// 					Serial1.print("finished y#2 at ");
+// 					Serial1.println(cur_y, DEC);
+					stopY();
+				}//is xs == 0
+			}//else if cur_x > -1
+		}//is xs == 2
+	}//while xs && ys;
+	stopX();
+	stopY();
+// 	Serial1.print("done (");
+// 	Serial1.print(cur_x);
 // 	Serial1.print(",");
 // 	Serial1.print(cur_y);
 // 	Serial1.println(")");
-// 
-// 	Serial1.print("new pos (");
-// 	Serial1.print(x, DEC);
-// 	Serial1.print(",");
-// 	Serial1.print(y);
-// 	Serial1.println(")");
-// 	
+/*
 	if (x < cur_x) {
 // 		Serial1.println("park X before move");
 		parkX();
@@ -480,6 +613,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			return false;
 		}
 	}
+	*/
 // 	Serial1.println("done");
 	return true;
 }
