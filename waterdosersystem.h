@@ -9,13 +9,7 @@
 	#include"bootscreen.h"
 #endif
 // #include <ShiftOut.h>
-#include <Servo.h>
 
-typedef enum AxisEnum{
-	wdsX,
-	wdsY,
-	wdsXY
-}AxisEnum;
 typedef enum AirTime{
 	atShort=1,
 	atMedium=2,
@@ -28,8 +22,8 @@ protected:
 	uint8_t  expander_addr;
 	uint16_t expander_state;
 	I2CExpander* exp;
-	int8_t cur_x, cur_y;
-	Servo srv;
+	int8_t cur_x, cur_y, errcode;
+// 	Servo srv;
 	int readCmdStatus(uint32_t timeout=0, char*replyOK=NULL);
 // 	bool execCmd(char*cmd, uint32_t timeout = 0, uint8_t tries = 0, char*replyOK = NULL);
 	void bwdX();

@@ -42,6 +42,11 @@
 
 #define Z_AXE_EN			(36)
 #define Z_AXE_DIR			(35)
+
+#define WDERR_STICKED		1
+#define WDERR_WFS_DEAD		2
+#define WDERR_POS_ERR		3
+
 /*
  *
 typedef struct WaterDoserSystemConfig{
@@ -119,6 +124,7 @@ void WaterDoserSystem::dope(AirTime at)
 
 void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 {
+	errcode = 0;
 	pinMode(X_AXE_DIR, OUTPUT);
 	pinMode(X_AXE_DIR2, OUTPUT);
 	pinMode(X_AXE_EN, OUTPUT);
@@ -147,19 +153,10 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 
-// 	while(true) {
-// 		testES();
-// 		delay(1000);
-// 	}
-// 	Serial1.println("tests ended");
+	servoDown();
  	servoUp();
-// 	delay(1000);
-// 	servoUnbind();
-     	parkX();
-     	parkY();
-//  	this->pipi(1,8,10);
-// 	this->pipi(1,8,10);
-// 	this->pipi(1,8,10);
+	parkY();
+	parkX();
 }
 
 void WaterDoserSystem::testAll()
@@ -195,6 +192,23 @@ void WaterDoserSystem::servoDown()
 	pinMode(Z_AXE_EN, OUTPUT);
 	digitalWrite(Z_AXE_EN, HIGH);
 	digitalWrite(Z_AXE_DIR, HIGH);
+	uint32_t start  = millis();
+	while (analogRead(6) > 100 && millis() - start < 1000);
+	//anti-stick system.would be great to add down-pos sensor optocoupler, but I'm so lazy...
+	int repeats = 0;
+	while (analogRead(6) > 100) {
+		digitalWrite(Z_AXE_EN, HIGH);
+		digitalWrite(Z_AXE_DIR, LOW);
+		delay(2000);
+		digitalWrite(Z_AXE_EN, HIGH);
+		digitalWrite(Z_AXE_DIR, HIGH);
+		delay(2000);
+		++repeats;
+		if (repeats > 6) {
+			errcode = WDERR_STICKED;
+			break;
+		}
+	}
 	delay(1000);
 // 	digitalWrite(Z_AXE_EN, LOW);
 }
@@ -211,7 +225,8 @@ bool WaterDoserSystem::nextX()
 			fwdX();
 		}
 	}
-	while (!digitalRead(X_STEP_PIN) && !digitalRead(X_STEP_PIN)) {
+	uint32_t start = millis();
+	while (!digitalRead(X_STEP_PIN) && !digitalRead(X_STEP_PIN) && (millis() - start < 1000) ) {
 		fwdX();
 	}
 	stopX();
@@ -234,7 +249,8 @@ bool WaterDoserSystem::nextY()
 			fwdY();
 		}
 	}
-	while (!digitalRead(Y_STEP_PIN) && !digitalRead(Y_STEP_PIN)) {
+	uint32_t start = millis();
+	while (!digitalRead(Y_STEP_PIN) && !digitalRead(Y_STEP_PIN) && (millis() - start < 1000)) {
 		fwdY();
 	}
 	stopY();
@@ -390,17 +406,21 @@ void WaterDoserSystem::testES()
 bool WaterDoserSystem::parkX()
 {
 	int val = 0;
+// 	Serial1.print("begin es val:");
+// 	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
 	while (digitalRead(X_BEGIN_PIN)) {
 		fwdX();
 	}
 	delay(500);
 	stopX();
-	val = analogRead(X_BEGIN_PIN);
+// 	Serial1.println("moving back");
+// 	val = analogRead(X_BEGIN_PIN);
 	while (!digitalRead(X_BEGIN_PIN)) {
 		bwdX();
 	}
 	stopX();
 	cur_x = -1;
+	return true;
 }
 
 bool WaterDoserSystem::parkY()
@@ -414,6 +434,7 @@ bool WaterDoserSystem::parkY()
 	}
 	stopY();
 	cur_y = -1;
+	return true;
 }
 
 bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
@@ -439,13 +460,14 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		Serial1.println("park Y before move");
 		parkY();
 		nextY();
-		Serial1.print("cur_y=");
-		Serial1.println(cur_y);
+// 		Serial1.print("cur_y=");
+// 		Serial1.println(cur_y);
 	}
 	
 	while (cur_x < x) {
 		if (!nextX()) {
 			Serial1.println("ERROR in X-pos");
+			errcode = WDERR_POS_ERR;
 			return false;
 		}
 	}
@@ -453,6 +475,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	while(cur_y < y) {
 		if (!nextY()) {
 			Serial1.println("ERROR in Y-pos");
+			errcode = WDERR_POS_ERR;
 			return false;
 		}
 	}
@@ -463,11 +486,17 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 
 uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 {
+	errcode = 0;
 	if(!this->moveToPos(x, y)) {
 		Serial1.println("ERROR while positioning");
 		return 0;
 	}
 	servoDown();
+	if (errcode > 0) {
+		Serial1.print("STOP due fatal error ");
+		Serial1.println(errcode, DEC);
+		return false;
+	}
 	pinMode(AIR_PIN, OUTPUT);
 	digitalWrite(AIR_PIN, HIGH);
 // 	this->init_measure();
@@ -476,7 +505,6 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 	dope(at);
 	servoUp();
 	delay(500);
-	servoUnbind();
 	return ret_ml;
 }
 

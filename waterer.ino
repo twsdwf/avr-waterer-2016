@@ -299,6 +299,7 @@ bool doCommand(char*cmd)
 // 				Serial1.println(tmp, DEC);
 				g_cfg.config.pots_count = tmp;
 				g_cfg.writeGlobalConfig();
+				Serial1.println("OK;");
 				return true;
 			}
          //pot set <index>,<flags>,<dev>,<pin>,<x>,<y>,<name>,<airTime>,<state>,<enabled>,<ml>,<pgm>,<param1>[,param2][,param3]...;
@@ -340,8 +341,8 @@ bool doCommand(char*cmd)
 // 			Serial1.print(ptr);
 // 			Serial1.println("]");
 			pc.wc.pgm = tmp;
-			Serial1.print("pgm=");
-			Serial1.println(pc.wc.pgm, DEC);
+// 			Serial1.print("pgm=");
+// 			Serial1.println(pc.wc.pgm, DEC);
 			if (pc.wc.pgm == 1) {
 				set_field<uint16_t>(pc.pgm.const_hum.value, &ptr);
 				set_field<uint16_t>(pc.pgm.const_hum.max_ml, &ptr);
@@ -351,6 +352,7 @@ bool doCommand(char*cmd)
 				set_field<uint16_t>(pc.pgm.hum_and_dry.max_ml, &ptr);				
 			}
 			g_cfg.savePot(index, pc);
+			Serial1.println("OK;");
 			/*
 typedef struct wateringConfig{
 	uint8_t	x:3;
@@ -544,3 +546,36 @@ void loop()
 // 	Serial1.println(freeMemory(), DEC);
 	delay(100);
 }
+/*
+cfg set 1,3,500,100,100,900,2100,1000,2100,3,30;
+
+0	0	euc x1
+0	1	баобаб
+0	2	euc 34/12
+0	3 	эвк. левее 34/12
+0	4	эвк. 34/13
+0	5	бао 34/5
+0	6	мушмула 34/4
+0	7	толстянка портулаковая  МАЖЕТ ПО ПОЗИЦИИ
+0	8	?? ошибка позиционирования
+1	0	длинный кактус(почти лысый)	34/6
+1	1	34/13
+1	2	34/15
+1	3	34/3
+1	4	34/10
+1	5	эвк. чёрный круглый горшок
+1	6	баобаб1
+1	7	алоэ
+1	8	альбиция(недофиолетовый)
+2	0	34/7
+2	1	ладанник
+2	2	свободен
+2	3	свободен -У
+2	4   свободен -У
+2	5	свободен -У
+2	6	свободен -У
+2	7	34/8
+2	8	34/9
+
+
+ */
