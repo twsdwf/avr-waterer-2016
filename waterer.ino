@@ -82,13 +82,13 @@ void scanFunc( byte addr, byte result )
 	Serial1.print("addr: ");
 	Serial1.print(addr, DEC);
 	if (addr == I2C_CLOCK_ADDRESS) {
-		Serial1.println(" DS1307 clock");
+		Serial1.println(" DS1307 clock;");
 	} else if ( (addr & 0xF8) == (0xF8 & I2C_MEMORY_ADDRESS) ) {
-		Serial1.println(" memory chip");
+		Serial1.println(" memory chip;");
 	} else if ( (addr & 0xF8) == PCF8574_ADDRESS) {
-		Serial1.println(" MCP23017/PCF8574");
+		Serial1.println(" MCP23017/PCF8574;");
 	} else {
-		Serial1.println("unknown device");
+		Serial1.println("unknown device;");
 	}
 // 	Serial1.print( (result==0) ? " found!":"       ");
 }
@@ -109,7 +109,8 @@ void print_now()
 	Serial1.print(":");
 	Serial1.print(ts.minute(), DEC);
 	Serial1.print(":");
-	Serial1.println(ts.second(), DEC);
+	Serial1.print(ts.second(), DEC);
+	Serial1.println(';');
 }
 
 void dumpPotConfig(uint8_t index)
@@ -147,7 +148,7 @@ void dumpPotConfig(uint8_t index)
 // 	print_field<uint8_t>(pot.wc.flags);
 // 	print_field<uint8_t>(pot.wc.ml);
 // 	Serial1.print(pot.name);
-	Serial1.println();
+// 	Serial1.println(';');
 }
 
 
@@ -207,7 +208,8 @@ bool doCommand(char*cmd)
 	} else if (IS(cmd, "WSZ", 3)) {
 		Serial1.print(WD_SIZE_X);
 		Serial1.print(",");
-		Serial1.println(WD_SIZE_Y);
+		Serial1.print(WD_SIZE_Y);
+		Serial1.println(';');
 	} else if(IS(cmd,"U", 1)) {
 		water_doser.servoUp();
 	}else if(IS(cmd,"D",1)) {
@@ -254,17 +256,18 @@ bool doCommand(char*cmd)
 		}
 		i2cExpander.i2c_off();
 	} else if (IS("ping", cmd, 4)) {
-		Serial1.println("pong");
+		Serial1.println("pong;");
 		print_now();
-		Serial1.println(__DATE__);
+		Serial1.print(__DATE__);
+		Serial1.println(';');
 	} else if (IS("time", cmd, 4)) {
 		if (IS(cmd+5, "get",3)) {
 		} else if (IS(cmd+5,"set",3)) {
 			//time set dd:dd:dd dd.d.dddd d
 			int dow, d, m, y, h, mi, s;
 			sscanf(cmd + 9, time_read_fmt,  &h, &mi, &s, &d, &m, &y, &dow);
-			Serial1.println(y, DEC);
-			Serial1.println(dow, DEC);
+// 			Serial1.print(y, DEC);
+// 			Serial1.println(dow, DEC);
 			DateTime td(y, m, d, h, mi, s, dow);
 			clock.adjust(td);
 			delay(1000);
@@ -302,14 +305,12 @@ bool doCommand(char*cmd)
 				Serial1.println("OK;");
 				return true;
 			}
-         //pot set <index>,<flags>,<dev>,<pin>,<x>,<y>,<name>,<airTime>,<state>,<enabled>,<ml>,<pgm>,<param1>[,param2][,param3]...;
+         //pot set <index:0>,<dev:1>,<pin:2>,<x:3>,<y:4>,<name:5>,<airTime:6>,<state:7>,<enabled:8>,<ml:9>,<pgm:10>,<param1:11>[,param2][,param3]...,<daymax>;
          //pot set 0,34,1,0,0,euc x1,2,0,1,30,1,700,500
 			uint8_t tmp, index;
 			char*ptr=cmd+8;
 			set_field<uint8_t>(index, &ptr);
 			potConfig pc = g_cfg.readPot(index);
-// 			set_field<uint8_t>(tmp, &ptr);
-// 			pc.sensor.flags = tmp;
 			set_field<uint8_t>(tmp, &ptr);
 			pc.sensor.dev = tmp;
 			set_field<uint8_t>(tmp, &ptr);
@@ -322,9 +323,6 @@ bool doCommand(char*cmd)
 			while (*ptr && *ptr!=',') *dst++ = *ptr++;
 			*dst = 0;
 			++ptr;
-// 			Serial1.print("tail [");
-// 			Serial1.print(ptr);
-// 			Serial1.println("]");
 			set_field<uint8_t>(tmp, &ptr);
 			pc.wc.airTime = tmp & 0x03;
 			set_field<uint8_t>(tmp, &ptr);
@@ -333,23 +331,25 @@ bool doCommand(char*cmd)
 			pc.wc.enabled = tmp & 1;
 			set_field<uint8_t>(tmp, &ptr);
 			pc.wc.ml = tmp;
-// 			Serial1.print("tail [");
-// 			Serial1.print(ptr);
-// 			Serial1.println("]");
 			set_field<uint8_t>(tmp, &ptr);
-// 			Serial1.print("tail [");
-// 			Serial1.print(ptr);
-// 			Serial1.println("]");
 			pc.wc.pgm = tmp;
-// 			Serial1.print("pgm=");
-// 			Serial1.println(pc.wc.pgm, DEC);
+			Serial1.print("pgm=");
+			Serial1.println(pc.wc.pgm, DEC);
 			if (pc.wc.pgm == 1) {
 				set_field<uint16_t>(pc.pgm.const_hum.value, &ptr);
 				set_field<uint16_t>(pc.pgm.const_hum.max_ml, &ptr);
+				Serial1.print(pc.pgm.const_hum.value, DEC);
+				Serial1.print(" daymax=");
+				Serial1.println(pc.pgm.const_hum.max_ml, DEC);
 			} else if (pc.wc.pgm == 2) {
 				set_field<uint16_t>(pc.pgm.hum_and_dry.min_value, &ptr);
 				set_field<uint16_t>(pc.pgm.hum_and_dry.max_value, &ptr);
-				set_field<uint16_t>(pc.pgm.hum_and_dry.max_ml, &ptr);				
+				set_field<uint16_t>(pc.pgm.hum_and_dry.max_ml, &ptr);
+				Serial1.print(pc.pgm.hum_and_dry.min_value, DEC);
+				Serial1.print("..");
+				Serial1.print(pc.pgm.hum_and_dry.max_value, DEC);
+				Serial1.print(" daymax=");
+				Serial1.println(pc.pgm.hum_and_dry.max_ml, DEC);
 			}
 			g_cfg.savePot(index, pc);
 			Serial1.println("OK;");
@@ -397,11 +397,11 @@ typedef struct wateringConfig{
 	} else if (IS("start", cmd, 5)) {
 		g_cfg.config.enabled = 1;
 		g_cfg.writeGlobalConfig();
-		Serial1.println("started");
+		Serial1.println("started;");
 	} else if (IS("stop", cmd, 4)) {
 		g_cfg.config.enabled = 0;
 		g_cfg.writeGlobalConfig();
-		Serial1.println("halted");
+		Serial1.println("halted;");
 	} else if (IS("restart", cmd, 7)) {
 		last_check_time = 0;
 		clock.writeRAMbyte(LAST_CHECK_TS_1, 0);
@@ -410,7 +410,7 @@ typedef struct wateringConfig{
 		clock.writeRAMbyte(LAST_CHECK_TS_4, 0);
 		g_cfg.config.enabled = 1;
 		g_cfg.writeGlobalConfig();
-		Serial1.println("started");
+		Serial1.println("started;");
 	} else if(IS("force", cmd, 5)) {
 		iForceWatering  = 1;
 	}
@@ -449,7 +449,7 @@ static const char s_step5[] PROGMEM = "water CTL inited";
 void setup()
 {
 	Serial1.begin(BT_BAUD);
-	Serial1.println("HELLO");
+	Serial1.println("HELLO;");
 	Wire.begin();
  	clock.begin();
 // 	for (uint8_t i = 8; i <0x3F; ++i) {
@@ -577,5 +577,26 @@ cfg set 1,3,500,100,100,900,2100,1000,2100,3,30;
 2	7	34/8
 2	8	34/9
 
-
+0,34,1,0,0,euc x1,2,0,1,30,1,670,500;
+1,34,0,0,1,baobab,2,0,0,20,2,500,650,300;
+2,34,12,0,2,euc 34/12,2,0,1,20,1,650,30;
+3,35,14,0,3,euc 35/14,2,0,1,30,1,700,500;
+4,34,14,0,4,euc 34/14,2,0,1,10,1,650,100;
+5,34,5,0,5,baobab 34/5,2,0,1,10,1,630,50;
+6,34,4,0,6,mushmula 34/4,2,0,1,10,1,604,50;
+7,35,8,0,7,tolstanka,2,0,1,10,1,400,50;
+8,35,9,0,8,euc"8",2,0,1,30,1,500,600;
+9,34,6,1,0,cereus 34/6,2,0,1,10,2,550,600,60;
+10,34,13,1,1,maklura 34/13,2,0,1,10,1,680,60;
+11,34,15,1,2,euc.kust 34/15,2,0,1,40,1,730,600;
+12,34,3,1,3,euc. 34/3,2,0,1,40,1,500,600;
+13,34,10,1,4,euc 34/10,2,0,1,40,1,600,600;
+14,35,13,1,5,euc in black pot ,2,0,1,30,1,600,600;
+15,35,11,1,6,baobab 1,2,0,1,30,2,500,600,300;
+16,35,15,1,7,aloe,2,0,1,20,2,460,500,80;
+17,35,10,1,8,albicia,2,0,1,30,1,900,200;
+18,34,7,2,0,euc 34/7,2,0,1,50,1,530,500;
+19,34,11,2,1,ladannik,2,0,1,50,1,700,300;
+20,34,8,2,7,maklura 34/8,2,0,1,10,1,650,60;
+21,34,9,2,8,morkovka 34/9,2,0,1,10,1,650,60;
  */
