@@ -36,6 +36,7 @@ protected:
 	bool nextY();
 	void dope(AirTime at=atMedium);
 public:
+	bool park();
 	bool parkX();
 	bool parkY();
 	void servoUp();

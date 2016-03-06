@@ -413,6 +413,9 @@ typedef struct wateringConfig{
 		Serial1.println("started;");
 	} else if(IS("force", cmd, 5)) {
 		iForceWatering  = 1;
+	} else if(IS("testall", cmd, 7)) {
+		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
+		wctl.doPotService(false);
 	}
 	return true;
 }

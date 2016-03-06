@@ -96,12 +96,7 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 		should_off = true;
 	}
 		this->begin(addr);
-		this->write(pin, HIGH);
 		delay(g_cfg.config.sensor_init_time);
-
-		pinMode(4, INPUT);
-		digitalWrite(4, HIGH);
-
 		this->write(PCF_PIN_INH, HIGH);
 		this->write(PCF_PIN_A, pin & 1);
 		this->write(PCF_PIN_B, pin & 2);
@@ -109,9 +104,11 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 		this->write(PCF_PIN_D, pin & 8);
 		this->write(PCF_PIN_INH, LOW);
 		
-		delay(g_cfg.config.sensor_read_time);
-
-		n = analogRead(AIN_PIN);
+		for (uint8_t i=0; i < g_cfg.config.sensor_measures; ++i) {
+			delay(g_cfg.config.sensor_read_time);
+			n += analogRead(AIN_PIN);
+		}
+		n /= g_cfg.config.sensor_measures;
 		
 		this->write(PCF_PIN_INH, HIGH);
 	if (should_off) {
@@ -120,6 +117,47 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 	return n;
 }
 
+bool I2CExpander::readSensorValues(sensorValues*data)
+{
+	uint32_t n = 0;
+	bool should_off = false;
+	if(!i2c_is_on) {
+		i2c_on();
+		should_off = true;
+	}
+
+	this->begin(data->address);
+	
+// 	if (!ping(false)) {
+// 		return false;
+// 	}
+	
+	delay(g_cfg.config.sensor_init_time);
+
+	for (uint8_t pin = 0; pin < 16; ++pin) {
+		this->write(PCF_PIN_INH, HIGH);
+		this->write(PCF_PIN_A, pin & 1);
+		this->write(PCF_PIN_B, pin & 2);
+		this->write(PCF_PIN_C, pin & 4);
+		this->write(PCF_PIN_D, pin & 8);
+		this->write(PCF_PIN_INH, LOW);
+		for(uint8_t i = 0; i < g_cfg.config.sensor_measures; ++i) {
+			delay(g_cfg.config.sensor_read_time);
+			data->pin_values[pin] += analogRead(AIN_PIN);
+		}
+		data->pin_values[pin] /= g_cfg.config.sensor_measures;
+// 		Serial1.print(data->address, DEC);
+// 		Serial1.print('/');
+// 		Serial1.print(pin, DEC);
+// 		Serial1.print(':');
+// 		Serial1.println(data->pin_values[pin], DEC);
+		this->write(PCF_PIN_INH, HIGH);
+	}
+	if (should_off) {
+		i2c_off();
+	}
+	return true;
+}
 
 bool I2CExpander::ping(bool print_out)
 {

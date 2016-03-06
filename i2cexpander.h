@@ -2,7 +2,7 @@
 #define __I2CEXPANDER_INC_
 
 #include <PCF8574.h>
-
+#include "awtypes.h"
 class I2CExpander:public PCF8574{
 
 protected:
@@ -11,6 +11,7 @@ protected:
 public:
 	I2CExpander();
 	int16_t read_pin(uint8_t addr, uint8_t pin);
+	bool readSensorValues(sensorValues*data);
 	virtual ~I2CExpander();
 // 	uint8_t get_mode();
 // 	void set_mode(uint8_t m);
@@ -18,6 +19,7 @@ public:
 	void i2c_off();
 	bool findNext(uint8_t from_addr, uint8_t to_addr, uint8_t* founded_dev_addr);
 	bool ping(bool print_out=true);
+	
 };
 
 

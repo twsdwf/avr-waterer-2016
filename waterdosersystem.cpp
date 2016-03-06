@@ -128,8 +128,9 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 
 	servoDown();
  	servoUp();
-	parkY();
-	parkX();
+ 	park();
+//  	parkY();
+//  	parkX();
 }
 
 void WaterDoserSystem::testAll()
@@ -370,6 +371,37 @@ void WaterDoserSystem::testES()
 	Serial1.print("Z begin=");
 	Serial1.println(analogRead(6), DEC);
 
+}
+bool WaterDoserSystem::park()
+{
+	uint8_t bits = 0x03;
+	fwdX();
+	fwdY();
+	while (bits) {
+		if (LOW == digitalRead(X_BEGIN_PIN)) {
+// 			stopX();
+			bits &= 0xFE;
+		}
+		if (HIGH == digitalRead(Y_BEGIN_PIN)) {
+// 			stopY();
+			bits &= 0xFD;
+		}
+	}
+	delay(1000);
+	bwdX();
+	bwdY();
+	bits = 0x03;
+	while (bits) {
+		if (HIGH == digitalRead(X_BEGIN_PIN)) {
+			stopX();
+			bits &= 0xFE;
+		}
+		if(LOW == digitalRead(Y_BEGIN_PIN)) {
+			stopY();
+			bits &= 0xFD;
+		}
+	}
+	return true;
 }
 
 bool WaterDoserSystem::parkX()

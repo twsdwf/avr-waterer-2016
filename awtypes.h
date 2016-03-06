@@ -81,6 +81,11 @@ typedef struct wateringProgram{
 	};
 }wateringProgram;
 
+typedef struct sensorValues{
+	uint8_t address;
+	int pin_values[16];
+}sensorValues;
+
 #define WCFG_STATE_WATERING		0x00
 #define WCFG_STATE_DRYING		0x02
 
