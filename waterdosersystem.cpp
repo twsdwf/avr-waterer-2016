@@ -225,10 +225,24 @@ bool WaterDoserSystem::nextX()
 			fwdX();
 		}
 	}
+	Serial1.print("cur_x:");
+	Serial1.println(cur_x, HEX);
+	
 	uint32_t start = millis();
-	while (!digitalRead(X_STEP_PIN) && !digitalRead(X_STEP_PIN) && (millis() - start < 1000) ) {
-		fwdX();
+	if(cur_x == -1) {
+		while (!digitalRead(X_STEP_PIN) && !digitalRead(X_STEP_PIN) ) {
+			fwdX();
+		}
+	} else {
+		while (true) {
+			if (digitalRead(X_STEP_PIN) == HIGH) {
+				if(millis() - start > 1000) break;
+			}
+			fwdX();
+		}
 	}
+	Serial1.print("step oc val:");
+	Serial1.println(digitalRead(X_STEP_PIN), DEC);
 	stopX();
 	if (digitalRead(X_STEP_PIN)) {
 		if (cur_x != 0xFF) {
@@ -250,8 +264,17 @@ bool WaterDoserSystem::nextY()
 		}
 	}
 	uint32_t start = millis();
-	while (!digitalRead(Y_STEP_PIN) && !digitalRead(Y_STEP_PIN) && (millis() - start < 1000)) {
-		fwdY();
+	if(cur_y == -1) {
+		while (!digitalRead(Y_STEP_PIN) && !digitalRead(Y_STEP_PIN) ) {
+			fwdY();
+		}
+	} else {
+		while (true) {
+			if (digitalRead(Y_STEP_PIN) == HIGH) {
+				if(millis() - start > 1000) break;
+			}
+			fwdY();
+		}
 	}
 	stopY();
 	if (digitalRead(Y_STEP_PIN)) {
