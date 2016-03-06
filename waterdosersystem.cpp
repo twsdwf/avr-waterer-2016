@@ -454,10 +454,11 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	Serial1.println(")");
 //*/
 	uint8_t xs=0, ys=0;
-	/*
+	/* state codes:
 		0 - stop
 		1 - park
-		2 - move
+		2 - move & wait LOW on *_STEP_PIN
+		3 - move & wait HIGH on *_STEP_PIN
 	 */
 	if (x < cur_x) {
 // 		Serial1.println("should park X");
@@ -584,7 +585,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 // 	Serial1.print(",");
 // 	Serial1.print(cur_y);
 // 	Serial1.println(")");
-/*
+/* old algo (move each axe separately)
 	if (x < cur_x) {
 // 		Serial1.println("park X before move");
 		parkX();
