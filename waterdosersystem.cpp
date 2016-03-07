@@ -184,7 +184,7 @@ void WaterDoserSystem::servoDown()
 			break;
 		}
 	}
-	delay(1000);
+	delay(500);
 // 	digitalWrite(Z_AXE_EN, LOW);
 }
 
@@ -453,6 +453,13 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	Serial1.print(y);
 	Serial1.println(")");
 //*/
+#define WDST_STOP		0
+#define WDST_PARK		1
+#define WDST_WAIT_LO_FWD	2
+#define WDST_WAIT_HI_FWD	3
+#define WDST_WAIT_LO_BWD	4
+#define WDST_WAIT_HI_BWD	5
+
 	uint8_t xs=0, ys=0;
 	/* state codes:
 		0 - stop
@@ -462,50 +469,60 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	 */
 	if (x < cur_x) {
 // 		Serial1.println("should park X");
-		xs = 1;
+		while (digitalRead(X_STEP_PIN) == HIGH) {
+			bwdX();
+		}
+		delay(200);
+		xs = WDST_WAIT_HI_BWD/*1*/;
 		bwdX();
-	} else if( cur_x < x){
-// 		Serial1.println("should move X");
-		xs = (digitalRead(X_STEP_PIN)==HIGH ? 3 : 2);
+	} else if ( cur_x < x) {
+ 		Serial1.println("should move X");
+// 		xs = (digitalRead(X_STEP_PIN)==HIGH ? 3 : 2);
+		xs = (digitalRead(X_STEP_PIN)==HIGH ? WDST_WAIT_HI_FWD : WDST_WAIT_LO_FWD);
 		fwdX();
 	}
 	if (y < cur_y) {
 // 		Serial1.println("should park Y");
-		ys = 1;
+		while (digitalRead(Y_STEP_PIN) == HIGH) {
+			bwdY();
+		}
+		delay(200);
+		ys = WDST_WAIT_HI_BWD/*1*/;
 		bwdY();
 	} else if (cur_y < y) {
-		ys = (digitalRead(Y_STEP_PIN)==HIGH ? 3 : 2);
+// 		ys = (digitalRead(Y_STEP_PIN)==HIGH ? 3 : 2);
+		ys = (digitalRead(Y_STEP_PIN)==HIGH ? WDST_WAIT_HI_FWD : WDST_WAIT_LO_FWD);
 		fwdY();
 // 		Serial1.println("should move Y");
 	}
 	uint32_t x_ms=millis(), y_ms=millis();
 	while (xs || ys) {
-		if (xs == 1) {
+		if (xs == WDST_PARK) {
 			if (HIGH == digitalRead(X_BEGIN_PIN)) {
 // 				Serial1.println("x parked. move fwd");
 				stopX();
 				fwdX();
 				x_ms = millis();
-				xs = 2;
+				xs = WDST_WAIT_LO_FWD;
 				cur_x = -1;
 			}
-		} else if (xs == 2) {//wait low state.
+		} else if (xs == WDST_WAIT_LO_FWD/*2*/) {//wait low state.
 			if (digitalRead(X_STEP_PIN) == LOW) {
-				xs = 3;
+				xs = WDST_WAIT_HI_FWD/*3*/;
 			}
-		} else if(xs == 3) {//wait HIGH
+		} else if (xs == WDST_WAIT_HI_FWD/*3*/) {//wait HIGH
 			if (cur_x == -1) {
 				if (digitalRead(X_STEP_PIN) && digitalRead(X_STEP_PIN) ) {
 					++cur_x;
 // 					Serial1.print("at x#1:");
 // 					Serial1.println(cur_x, DEC);
-					xs = ((cur_x < x) ? 2 : 0);
+					xs = ((cur_x < x) ? WDST_WAIT_LO_FWD/*2*/ : WDST_STOP/*0*/);
 // 					Serial1.print("xs=");
 // 					Serial1.println(xs, DEC);
 					x_ms = millis();
 				}
 				
-				if (xs == 0) {
+				if (xs == WDST_STOP/*0*/) {
 // 					Serial1.print("finished x#1 at ");
 // 					Serial1.println(cur_x, DEC);
 					stopX();
@@ -518,43 +535,63 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 // 						Serial1.print("at x#2:");
 // 						Serial1.println(cur_x, DEC);
 						x_ms = millis();
-						xs = ((cur_x < x) ? 2 : 0);
+						xs = ((cur_x < x) ? /*2*/WDST_WAIT_LO_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
-				if (xs == 0) {
+				if (xs == WDST_STOP/*0*/) {
 // 					Serial1.print("finished x#2 at ");
 // 					Serial1.println(cur_x, DEC);					
 					stopX();
 				}//is xs == 0
 			}//else if cur_x > -1
-		}//is xs == 2
+		} else if (xs == WDST_WAIT_HI_BWD) {
+			if (digitalRead(X_BEGIN_PIN) == HIGH) {
+				Serial1.println("ERROR: x at start");
+				stopX();
+				stopY();
+				return false;
+			}
+			if (digitalRead(X_STEP_PIN) == HIGH && (millis() - x_ms > 1000) ) {
+				x_ms = millis();
+				--cur_x;
+				xs = WDST_WAIT_LO_BWD;
+			}
+		} else if (xs == WDST_WAIT_LO_BWD) {
+			if (digitalRead(X_STEP_PIN) == LOW && (millis() - x_ms > 200)) {
+				xs = ( (cur_x == x) ? WDST_STOP : WDST_WAIT_HI_BWD);
+				x_ms = millis();
+			}
+			if (xs == WDST_STOP) {
+				stopX();
+			}
+		}
 
-		if (ys == 1) {
-			if (LOW == digitalRead(Y_BEGIN_PIN)) {
+		if (ys == WDST_PARK) {
+			if (HIGH == digitalRead(Y_BEGIN_PIN)) {
 // 				Serial1.println("y parked. move fwd");
 				stopY();
 				fwdY();
 				y_ms = millis();
-				ys = 2;
+				ys = WDST_WAIT_LO_FWD;
 				cur_y = -1;
 			}
-		} else if (ys == 2) {//wait low state.
+		} else if (ys == WDST_WAIT_LO_FWD/*2*/) {//wait low state.
 			if (digitalRead(Y_STEP_PIN) == LOW) {
-				ys = 3;
+				ys = WDST_WAIT_HI_FWD/*3*/;
 			}
-		} else if(ys == 3) {//wait HIGH
+		} else if (ys == WDST_WAIT_HI_FWD/*3*/) {//wait HIGH
 			if (cur_y == -1) {
 				if (digitalRead(Y_STEP_PIN) && digitalRead(Y_STEP_PIN) ) {
 					++cur_y;
 // 					Serial1.print("at y#1:");
 // 					Serial1.println(cur_y, DEC);
-					ys = ((cur_y < y) ? 2 : 0);
+					ys = ((cur_y < y) ? WDST_WAIT_LO_FWD/*2*/ : WDST_STOP/*0*/);
 // 					Serial1.print("ys=");
 // 					Serial1.println(ys, DEC);
 					y_ms = millis();
 				}
 
-				if (ys == 0) {
+				if (ys == WDST_STOP/*0*/) {
 // 					Serial1.print("finished y#1 at ");
 // 					Serial1.println(cur_y, DEC);
 					stopY();
@@ -567,16 +604,36 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 // 						Serial1.print("at y#2:");
 // 						Serial1.println(cur_y, DEC);
 						y_ms = millis();
-						ys = ((cur_y < y) ? 2 : 0);
+						ys = ((cur_y < y) ? /*2*/WDST_WAIT_LO_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
-				if (ys == 0) {
+				if (ys == WDST_STOP/*0*/) {
 // 					Serial1.print("finished y#2 at ");
 // 					Serial1.println(cur_y, DEC);
 					stopY();
-				}//is xs == 0
-			}//else if cur_x > -1
-		}//is xs == 2
+				}//is ys == 0
+			}//else if cur_y > -1
+		} else if (ys == WDST_WAIT_HI_BWD) {
+			if (digitalRead(Y_BEGIN_PIN) == LOW) {
+				Serial1.println("ERROR: y at start");
+				stopX();
+				stopY();
+				return false;
+			}
+			if (digitalRead(Y_STEP_PIN) == HIGH && (millis() - y_ms > 1000) ) {
+				y_ms = millis();
+				--cur_y;
+				ys = WDST_WAIT_LO_BWD;
+			}
+		} else if (ys == WDST_WAIT_LO_BWD) {
+			if (digitalRead(Y_STEP_PIN) == LOW && (millis() - y_ms > 200)) {
+				ys = ( (cur_y == y) ? WDST_STOP : WDST_WAIT_HI_BWD);
+				y_ms = millis();
+			}
+			if (ys == WDST_STOP) {
+				stopY();
+			}
+		}
 	}//while xs && ys;
 	stopX();
 	stopY();
@@ -642,7 +699,7 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 	Serial1.println(';');
 	dope(at);
 	servoUp();
-	delay(500);
+// 	delay(500);
 	return ret_ml;
 }
 
