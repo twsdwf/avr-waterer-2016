@@ -186,7 +186,9 @@ void printGcfg()
 bool doCommand(char*cmd)
 {
 	static const char time_read_fmt[] /*PROGMEM*/ = "%d:%d:%d %d.%d.%d %d";
-	if (IS(cmd, "+", 1)) {
+	if (IS(cmd,"A", 1)) {
+		Serial1.println(analogRead(cmd[1]-'0'), DEC);
+	} else if (IS(cmd, "+", 1)) {
 		int pin = atoi(cmd+1);
 		if(pin > 2) {
 			pinMode(pin, OUTPUT);
@@ -469,13 +471,13 @@ void setup()
 // 			Serial1.println(i);
 // 		}
 // 	}
-  	g_cfg.begin();
-	
-	g_cfg.readGlobalConfig();
+//   	g_cfg.begin();
+// 	g_cfg.readGlobalConfig();
 // 	g_cfg.config.enabled = 0;
-   	water_doser.begin();
- 	wctl.init(&i2cExpander);
- 	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
+	water_doser.begin();
+	Serial1.println("setup() end");
+//  	wctl.init(&i2cExpander);
+//  	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
 }
 
 /**
@@ -487,9 +489,10 @@ bool midnight_skip = false;
 void loop()
 {
 
-	PORTE = PINE ^ (1<<2);
 	
+	PORTE = PINE ^ (1<<2);
 	checkCommand();
+	return;
 // 	return;
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
@@ -523,7 +526,7 @@ void loop()
 */
 		if ((now.secondstime() - last_check_time > 30 * 60) || iForceWatering) {
 
- 			wctl.doPotService(0);
+ 			wctl.doPotService(1);
 
 			iForceWatering = 0;
 		}

@@ -85,7 +85,7 @@ int WateringController::run_checks()
 			Serial1.println(';');
 		}
 	}
-	
+	i2cexp->i2c_off();
 	int watering_plants = 0;
 // 	water_doser.prepareWatering();
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
@@ -93,7 +93,6 @@ int WateringController::run_checks()
 		if (ret <= 0) continue;
 		watering_plants += ret;
 	}//for i
-	i2cexp->i2c_off();
 	return watering_plants;
 }
 
@@ -196,18 +195,18 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 
 		if ( pot.wc.state == 1) {
 			Serial.print(" drying ");
-			if ( cur_value > pot.pgm.hum_and_dry.min_value -  pot.sensor.noise_delta) {
+			if ( cur_value < pot.pgm.hum_and_dry.min_value +  pot.sensor.noise_delta) {
 				pot.wc.state = 0;
 				g_cfg.savePot(index, pot);
 				Serial1.println(" end;");
 				should_water = true;
 			} else {
 				Serial1.println(" again;");
-				should_water = true;
+				should_water = false;
 			}
 		} else {
 			Serial1.print(" wetting ");
-			if ( abs(cur_value - pot.pgm.hum_and_dry.max_value) <= pot.sensor.noise_delta) {
+			if ( cur_value > pot.pgm.hum_and_dry.max_value - pot.sensor.noise_delta) {
 				Serial1.println(" wet enough. start drying;");
 				pot.wc.state = 1;
 				g_cfg.savePot(index, pot);
