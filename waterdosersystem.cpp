@@ -136,15 +136,15 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	cur_y = 0xFF;
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
-
-// 	servoDown();
-//  	servoUp();
-//  	park();
-	Serial1.println("parking...");
+	
+ 	servoDown();
+  	servoUp();
+#ifdef MY_ROOM
+  	park();
+#else
   	parkY();
-	Serial1.println("Y done. X...");
   	parkX();
-	Serial1.println("X done.");
+#endif
 }
 
 void WaterDoserSystem::testAll()
@@ -170,11 +170,11 @@ void WaterDoserSystem::servoUp()
 	pinMode(Z_AXE_EN, OUTPUT);
 	digitalWrite(Z_AXE_EN, HIGH);
 	digitalWrite(Z_AXE_DIR, LOW);//UP
-#ifdef MY_ROOM
+ #ifdef MY_ROOM
 	while (analogRead(6) < 200);
-#else
-	delay(500);
-#endif
+ #else
+	while (analogRead(6) > 300);
+ #endif
 	digitalWrite(Z_AXE_DIR, LOW);
 	digitalWrite(Z_AXE_EN, LOW);
 }
@@ -186,11 +186,18 @@ void WaterDoserSystem::servoDown()
 	digitalWrite(Z_AXE_EN, HIGH);
 	digitalWrite(Z_AXE_DIR, HIGH);
 	uint32_t start  = millis();
-#ifdef MY_ROOM
+ #ifdef MY_ROOM
 	while (analogRead(6) > 100 && millis() - start < 1000);
+#else
+	while (analogRead(6) < 500);
+#endif
 	//anti-stick system.would be great to add down-pos sensor optocoupler, but I'm so lazy...
 	int repeats = 0;
+#ifdef MY_ROOM
 	while (analogRead(6) > 100) {
+#else
+	while (analogRead(6) < 500) {
+#endif
 		digitalWrite(Z_AXE_EN, HIGH);
 		digitalWrite(Z_AXE_DIR, LOW);
 		delay(2000);
@@ -203,9 +210,6 @@ void WaterDoserSystem::servoDown()
 			break;
 		}
 	}
-#else
-	delay(1000);
-#endif
 	delay(500);
 // 	digitalWrite(Z_AXE_EN, LOW);
 }
@@ -437,6 +441,8 @@ bool WaterDoserSystem::parkX()
 	}
 #else
 	while (analogRead(X_BEGIN_PIN - A0) <= (X_BEGIN_STOPVAL*1.1) ) {
+		Serial1.print("fwdX es:");
+		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		fwdX();
 	}
 #endif
@@ -450,9 +456,13 @@ bool WaterDoserSystem::parkX()
 	}
 #else
 	while(analogRead(X_BEGIN_PIN - A0) >= X_BEGIN_STOPVAL) {
+		Serial1.print("bwdX es:");
+		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		bwdX();
 	}
 	while(analogRead(X_BEGIN_PIN - A0) <= X_BEGIN_STOPVAL) {
+		Serial1.print("fwd2 X es:");
+		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		fwdX();
 	}
 	delay(500);
@@ -513,7 +523,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 #define WDST_WAIT_HI_FWD	3
 #define WDST_WAIT_LO_BWD	4
 #define WDST_WAIT_HI_BWD	5
-
+#ifdef MY_ROOM
 	uint8_t xs=0, ys=0;
 	/* state codes:
 		0 - stop
@@ -696,7 +706,8 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 // 	Serial1.print(",");
 // 	Serial1.print(cur_y);
 // 	Serial1.println(")");
-/* old algo (move each axe separately)
+/* old algo (move each axe separately)*/
+#else
 	if (x < cur_x) {
 // 		Serial1.println("park X before move");
 		parkX();
@@ -725,8 +736,9 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			return false;
 		}
 	}
-	*/
-// 	Serial1.println("done");
+	
+ 	Serial1.println("done");
+#endif
 	return true;
 }
 
