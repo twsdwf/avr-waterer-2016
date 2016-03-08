@@ -139,12 +139,12 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	
  	servoDown();
   	servoUp();
-#ifdef MY_ROOM
+// #ifdef MY_ROOM
   	park();
-#else
-  	parkY();
-  	parkX();
-#endif
+// #else
+//   	parkY();
+//   	parkX();
+// #endif
 }
 
 void WaterDoserSystem::testAll()
@@ -404,25 +404,44 @@ bool WaterDoserSystem::park()
 	fwdX();
 	fwdY();
 	while (bits) {
-		if (LOW == digitalRead(X_BEGIN_PIN)) {
+#ifdef MY_ROOM
+		if (LOW == digitalRead(X_BEGIN_PIN))
+#else
+		if (analogRead(X_BEGIN_PIN - A0) > (X_BEGIN_STOPVAL*1.1))
+#endif
+		{
 // 			stopX();
 			bits &= 0xFE;
 		}
-		if (HIGH == digitalRead(Y_BEGIN_PIN)) {
-// 			stopY();
+#ifdef MY_ROOM
+		if (HIGH == digitalRead(Y_BEGIN_PIN))
+#else
+		if (analogRead(Y_BEGIN_PIN - A0) > (Y_BEGIN_STOPVAL*1.1))
+#endif
+		{
 			bits &= 0xFD;
 		}
-	}
+	}//while bits
 	delay(1000);
 	bwdX();
 	bwdY();
 	bits = 0x03;
 	while (bits) {
-		if (HIGH == digitalRead(X_BEGIN_PIN)) {
+#ifdef MY_ROOM
+		if (HIGH == digitalRead(X_BEGIN_PIN))
+#else
+		if (analogRead(X_BEGIN_PIN - A0) <= X_BEGIN_STOPVAL)
+#endif
+		{
 			stopX();
 			bits &= 0xFE;
 		}
-		if(LOW == digitalRead(Y_BEGIN_PIN)) {
+#ifdef MY_ROOM
+		if (LOW == digitalRead(Y_BEGIN_PIN))
+#else
+		if (analogRead(Y_BEGIN_PIN - A0) <= Y_BEGIN_STOPVAL)
+#endif
+		{
 			stopY();
 			bits &= 0xFD;
 		}
