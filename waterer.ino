@@ -397,6 +397,7 @@ typedef struct wateringConfig{
 			printGcfg();
 		}
 	} else if (IS("start", cmd, 5)) {
+		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 		g_cfg.config.enabled = 1;
 		g_cfg.writeGlobalConfig();
 		Serial1.println("started;");
@@ -406,6 +407,7 @@ typedef struct wateringConfig{
 		Serial1.println("halted;");
 	} else if (IS("restart", cmd, 7)) {
 		last_check_time = 0;
+		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 		clock.writeRAMbyte(LAST_CHECK_TS_1, 0);
 		clock.writeRAMbyte(LAST_CHECK_TS_2, 0);
 		clock.writeRAMbyte(LAST_CHECK_TS_3, 0);
@@ -414,7 +416,8 @@ typedef struct wateringConfig{
 		g_cfg.writeGlobalConfig();
 		Serial1.println("started;");
 	} else if(IS("force", cmd, 5)) {
-		iForceWatering  = 1;
+		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
+		wctl.doPotService(true);
 	} else if(IS("testall", cmd, 7)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 		wctl.doPotService(false);
@@ -471,13 +474,13 @@ void setup()
 // 			Serial1.println(i);
 // 		}
 // 	}
-//   	g_cfg.begin();
-// 	g_cfg.readGlobalConfig();
+   	g_cfg.begin();
+ 	g_cfg.readGlobalConfig();
 // 	g_cfg.config.enabled = 0;
 	water_doser.begin();
 	Serial1.println("setup() end");
-//  	wctl.init(&i2cExpander);
-//  	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
+  	wctl.init(&i2cExpander);
+  	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
 }
 
 /**
@@ -492,7 +495,7 @@ void loop()
 	
 	PORTE = PINE ^ (1<<2);
 	checkCommand();
-	return;
+// 	return;
 // 	return;
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();

@@ -4,7 +4,7 @@ BOARD_TAG=atmega128
 BOARD_SUB=atmega128
 ISP_PROG=usbasp
 F_CPU=16000000L
-CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DBIG_ROOM
+CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DMY_ROOM
 #-DMY_ROOM
 AVRDUDE_CONF = /root/arduino-1.6.5-r5/hardware/tools/avr/etc/avrdude.conf
 AVRDUDE = /root/arduino-1.6.5-r5/hardware/tools/avr/bin/avrdude

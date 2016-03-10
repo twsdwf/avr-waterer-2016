@@ -174,13 +174,14 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 		Serial1.print(cur_value, DEC);
  		if ( abs(cur_value - pot.pgm.const_hum.value) <= pot.sensor.noise_delta) {
 			Serial1.println(" wet enough;");
- 			return false;
- 		}
- 		should_water = (cur_value < pot.pgm.const_hum.value);
-		Serial1.print(" should_water:");
-		Serial1.print(should_water, DEC);
-		Serial1.println(';');
- 		return should_water;
+ 			should_water = false;
+ 		} else {
+			should_water = (cur_value < pot.pgm.const_hum.value);
+			Serial1.print(" should_water:");
+			Serial1.print(should_water, DEC);
+			Serial1.println(';');
+		}
+//  		return should_water;
 	} else if (pot.wc.pgm == 2) {
 		Serial1.print(" range ");
 		Serial1.print(pot.pgm.hum_and_dry.min_value, DEC);
@@ -250,6 +251,8 @@ void WateringController::run_watering(bool real)
 	uint8_t data = 0;
 	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_WATER);
 // 	water_doser.prepareWatering();
+	Serial1.print("real watering:");
+	Serial1.println(real, DEC);
 	uint8_t i = 0;
 	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr) {
 		data = clock.readRAMbyte(addr);
