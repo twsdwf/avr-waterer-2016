@@ -234,8 +234,8 @@ typedef struct globalConfig{
 	uint16_t water_end_time_we;
 	uint8_t sensor_measures;
 	uint8_t test_interval;
-// 	uint8_t lcd_highlight_value;
-}globalConfig;//19 bytes
+ 	uint16_t lux_barrier_value;
+}globalConfig;//21 bytes
 
 extern HardwareSerial Serial1;
 // extern Configuration g_cfg;

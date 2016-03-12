@@ -1,4 +1,4 @@
-#include <Servo.h>
+// #include <Servo.h>
 /*
  * надо сделать:
  = насос,счётчик жидкости
@@ -16,6 +16,12 @@
 #include <AT24Cxxx.h>
 #include <math.h>
 #include <PCF8574.h>
+#ifdef MY_ROOM
+	#define PLANT_LIGHT_PIN 12
+	#include <BH1750.h>
+#endif
+
+#include<EEPROM.h>
 
 #include "config_defines.h"
 #include "awtypes.h"
@@ -27,7 +33,6 @@
 #define USE_CLI
 
 #include "messages_en.h"
-
 #include "configuration.h"
 #include "waterdosersystem.h"
 #include "i2cexpander.h"
@@ -43,6 +48,9 @@ extern "C" {
  * 			GLOBAL VARIABLES
 ***************************************************************************************************/
 
+#ifdef MY_ROOM
+	BH1750 lightMeter;
+#endif
 volatile uint32_t last_check_time = 0;
 
 RTC_DS1307 clock;
@@ -186,11 +194,60 @@ void printGcfg()
 bool doCommand(char*cmd)
 {
 	static const char time_read_fmt[] /*PROGMEM*/ = "%d:%d:%d %d.%d.%d %d";
-	if (IS(cmd,"A", 1)) {
+	/*if (IS(cmd,"er", 2)) {
+		Serial1.println(EEPROM.read(33));
+		
+	} else if (IS(cmd,"ew", 2)) {
+		EEPROM.write(33, 55);
+		Serial1.println("OK;");
+	} else if (IS(cmd,"et")) {
+		uint8_t tmp;
+		for (uint16_t i=0;i<4096;++i) {
+			EEPROM.write(i, 0x55);
+			tmp = EEPROM.read(i);
+			if (tmp!=0x55) {
+				Serial1.print("error 55 at ");
+				Serial1.print(i, DEC);
+				Serial1.print(" ");
+				Serial1.println(tmp, HEX);
+			}
+			EEPROM.write(i, 0xAA);
+			tmp = EEPROM.read(i);
+			if (tmp!=0xAA) {
+				Serial1.print("error AA at ");
+				Serial1.print(i, DEC);
+				Serial1.print(" ");
+				Serial1.println(tmp, HEX);
+			}
+		}
+		Serial1.println("done;");
+	} else */
+	if (IS(cmd, "stat", 4)) {
+		if (IS(cmd+5, "clr", 3)) {
+			wctl.cleanDayStat();
+		} else if (IS(cmd + 5, "get", 3)) {
+			wctl.printDayStat();
+		}
+	} else if (IS("lux", cmd, 3)) {
+#ifdef MY_ROOM
+		if (cmd[4]=='?') {
+			Serial1.print("lux:");
+			Serial1.println(lightMeter.readLightLevel(), DEC);
+		} else if (cmd[3] == '=') {
+			g_cfg.config.lux_barrier_value = atoi(cmd+5);
+			g_cfg.writeGlobalConfig();
+			g_cfg.readGlobalConfig();
+			Serial1.print("new lux value=");
+			Serial1.println(g_cfg.config.lux_barrier_value, DEC);
+		}
+#endif
+	} else if (IS(cmd,"A", 1)) {
 		Serial1.println(analogRead(cmd[1]-'0'), DEC);
 	} else if (IS(cmd, "+", 1)) {
 		int pin = atoi(cmd+1);
 		if(pin > 2) {
+			Serial1.print("HIGH pin:");
+			Serial1.println(pin, DEC);
 			pinMode(pin, OUTPUT);
 			digitalWrite(pin, HIGH);
 		}
@@ -389,8 +446,7 @@ typedef struct wateringConfig{
 			set_field<uint16_t>(g_cfg.config.water_start_time_we, &ptr);
 			set_field<uint16_t>(g_cfg.config.water_end_time_we, &ptr);
 			set_field<uint8_t>(g_cfg.config.sensor_measures, &ptr);
-			set_field<uint8_t>(g_cfg.config.test_interval, &ptr);
-			
+			set_field<uint8_t>(g_cfg.config.test_interval, &ptr);	
 			g_cfg.writeGlobalConfig();
 			printGcfg();
 			g_cfg.readGlobalConfig();
@@ -460,6 +516,11 @@ void setup()
 	Serial1.println("HELLO;");
 	Wire.begin();
  	clock.begin();
+#ifdef MY_ROOM
+	lightMeter.begin();
+	pinMode(PLANT_LIGHT_PIN, OUTPUT);
+	digitalWrite(PLANT_LIGHT_PIN, LOW);
+#endif
 // 	for (uint8_t i = 8; i <0x3F; ++i) {
 // 		clock.writeRAMbyte(i, 0xAA);
 // 		delay(10);
@@ -480,6 +541,7 @@ void setup()
 	water_doser.begin();
 	Serial1.println("setup() end");
   	wctl.init(&i2cExpander);
+	pinMode(AQUARIUM_PIN, OUTPUT);
   	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
 }
 
@@ -512,7 +574,19 @@ void loop()
 	Serial1.print(g_cfg.config.water_start_time_we, DEC);
 	Serial1.print(" ");
 	Serial1.println(g_cfg.config.water_end_time_we, DEC);
-*/	
+*/
+#ifdef MY_ROOM
+	if(now_m > 900 && now_m < 2100) {
+		digitalWrite(AQUARIUM_PIN, HIGH);
+		uint16_t lux = lightMeter.readLightLevel();
+		pinMode(PLANT_LIGHT_PIN, OUTPUT);
+		digitalWrite(PLANT_LIGHT_PIN, lux < g_cfg.config.lux_barrier_value);
+	} else {
+		digitalWrite(AQUARIUM_PIN, LOW);
+		pinMode(PLANT_LIGHT_PIN, OUTPUT);
+		digitalWrite(PLANT_LIGHT_PIN, LOW);
+	}
+#endif
 	if ( g_cfg.config.enabled
 			&& (
 					(now.dayOfWeek() < 6 && now_m > g_cfg.config.water_start_time && now_m < g_cfg.config.water_end_time)
@@ -545,7 +619,7 @@ void loop()
 // 		wctl.midnightTasks();
 // 		Serial1.println("wctl.midnightTasks() ended");
 		Serial1.flush();
-		g_cfg.midnight_tasks();
+		wctl.cleanDayStat();
 // 		Serial1.println("g_cfg.midnight_tasks(); ended");
 // 		Serial1.flush();
 		midnight_skip = true;

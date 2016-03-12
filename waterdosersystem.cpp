@@ -29,6 +29,8 @@
 #define X_AXE_EN			40
 #define Y_AXE_EN			39
 
+#define VCC_PUMP_EN			34
+
 #ifdef MY_ROOM
 	#define X_BEGIN_PIN			23 // wrong: analog! PF6/D49
 #else
@@ -123,7 +125,11 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	pinMode(Y_STEP_PIN, INPUT);
 
 	pinMode(AIR_PIN, OUTPUT);
+	
 	digitalWrite(AIR_PIN, LOW);
+
+	pinMode(VCC_PUMP_EN, OUTPUT);
+	digitalWrite(VCC_PUMP_EN, LOW);
 	
 	digitalWrite(X_AXE_DIR, LOW);
 	digitalWrite(X_AXE_DIR2, LOW);
@@ -166,6 +172,9 @@ void WaterDoserSystem::testAll()
 
 void WaterDoserSystem::servoUp()
 {
+	pinMode(VCC_PUMP_EN, OUTPUT);
+	digitalWrite(VCC_PUMP_EN, HIGH);
+	
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 	digitalWrite(Z_AXE_EN, HIGH);
@@ -177,10 +186,15 @@ void WaterDoserSystem::servoUp()
  #endif
 	digitalWrite(Z_AXE_DIR, LOW);
 	digitalWrite(Z_AXE_EN, LOW);
+	
+	digitalWrite(VCC_PUMP_EN, LOW);
 }
 
 void WaterDoserSystem::servoDown()
 {
+	pinMode(VCC_PUMP_EN, OUTPUT);
+	digitalWrite(VCC_PUMP_EN, HIGH);
+	delay(100);
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 	digitalWrite(Z_AXE_EN, HIGH);
@@ -216,7 +230,9 @@ void WaterDoserSystem::servoDown()
 
 void WaterDoserSystem::servoUnbind()
 {
+
 	digitalWrite(Z_AXE_EN, LOW);
+	digitalWrite(VCC_PUMP_EN, LOW);
 }
 	
 bool WaterDoserSystem::nextX()
@@ -330,11 +346,13 @@ void WaterDoserSystem::fwdY()
 uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 {
  	uint16_t wftpl = 3900;
- 	uint16_t ticks = round( (float)ml * (float)wftpl * 0.001)*2;
+ 	uint16_t ticks = round( (float)ml * (float)wftpl * 0.001);
  	__wfs_run_mode = wdstWater;
  	exp->begin(expander_addr);
 	pinMode(PUMP_PIN, OUTPUT);
 	digitalWrite(PUMP_PIN, HIGH);
+	pinMode(VCC_PUMP_EN, OUTPUT);
+	digitalWrite(VCC_PUMP_EN, HIGH);
 
 	pinMode(WFS_PIN, INPUT_PULLUP);
 
@@ -358,15 +376,16 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 		errcode = WDERR_WFS_DEAD;
  	}
 // 	Serial1.println(__LINE__, DEC);
-// 	Serial1.println("end of measure");
-// 	Serial1.flush();
-// 	Serial1.print("ticks:");
-// 	Serial1.print(ticks, DEC);
-// 	Serial1.print("flag:[");
-// 	Serial1.print(__wfs_flag, DEC);
-// 	Serial1.println("]");
-// 	Serial1.flush();
+ 	Serial1.println("end of measure");
+ 	Serial1.flush();
+ 	Serial1.print("ticks:");
+ 	Serial1.print(ticks, DEC);
+ 	Serial1.print("flag:[");
+ 	Serial1.print(__wfs_flag, DEC);
+ 	Serial1.println("]");
+ 	Serial1.flush();
  	uint16_t _ml = round(__wfs_flag * 1000.0/(float)wftpl);
+	digitalWrite(VCC_PUMP_EN, LOW);
 // 	ws.dec(ws_index, ml);
  	return _ml;
 
@@ -376,6 +395,8 @@ void WaterDoserSystem::haltPumps()
 {
 	pinMode(PUMP_PIN, OUTPUT);
 	digitalWrite(PUMP_PIN, LOW);
+	pinMode(VCC_PUMP_EN, OUTPUT);
+	digitalWrite(VCC_PUMP_EN, LOW);
 }
 
 void WaterDoserSystem::testES()
@@ -559,7 +580,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		xs = WDST_WAIT_HI_BWD/*1*/;
 		bwdX();
 	} else if ( cur_x < x) {
- 		Serial1.println("should move X fwd");
+//  		Serial1.println("should move X fwd");
 // 		xs = (digitalRead(X_STEP_PIN)==HIGH ? 3 : 2);
 		xs = (digitalRead(X_STEP_PIN)==HIGH ? WDST_WAIT_HI_FWD : WDST_WAIT_LO_FWD);
 		fwdX();
@@ -602,17 +623,17 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (cur_x == -1) {
 				if (digitalRead(X_STEP_PIN) && digitalRead(X_STEP_PIN) ) {
 					++cur_x;
- 					Serial1.print("at x#1:");
-					Serial1.println(cur_x, DEC);
+//  					Serial1.print("at x#1:");
+// 					Serial1.println(cur_x, DEC);
 					xs = ((cur_x < x) ? WDST_WAIT_LO_FWD/*2*/ : WDST_STOP/*0*/);
- 					Serial1.print("xs=");
- 					Serial1.println(xs, DEC);
+//  					Serial1.print("xs=");
+//  					Serial1.println(xs, DEC);
 					x_ms = millis();
 				}
 				
 				if (xs == WDST_STOP/*0*/) {
- 					Serial1.print("finished x#1 at ");
- 					Serial1.println(cur_x, DEC);
+//  					Serial1.print("finished x#1 at ");
+//  					Serial1.println(cur_x, DEC);
 					stopX();
 				}
 			} else {
@@ -620,15 +641,15 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				if (digitalRead(X_STEP_PIN) == HIGH) {
 					if (millis() - x_ms > 1000) {
 						++cur_x;
- 						Serial1.print("at x#2:");
- 						Serial1.println(cur_x, DEC);
+//  						Serial1.print("at x#2:");
+//  						Serial1.println(cur_x, DEC);
 						x_ms = millis();
 						xs = ((cur_x < x) ? /*2*/WDST_WAIT_LO_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
 				if (xs == WDST_STOP/*0*/) {
- 					Serial1.print("finished x#2 at ");
- 					Serial1.println(cur_x, DEC);
+//  					Serial1.print("finished x#2 at ");
+//  					Serial1.println(cur_x, DEC);
 					stopX();
 				}//is xs == 0
 			}//else if cur_x > -1

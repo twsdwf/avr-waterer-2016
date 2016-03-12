@@ -9,7 +9,7 @@
 #include "configuration.h"
 #include "waterdosersystem.h"
 #include "i2cexpander.h"
-
+#include<EEPROM.h>
 #include "wateringcontroller.h"
 // #include "mmc.h"
 // #include "stat.h"
@@ -25,6 +25,20 @@ extern uint32_t last_check_time;
 // extern ErrLogger logger;
 
 #define POTS_AT_ONCE	24
+uint16_t WateringController::readDayML(uint8_t index)
+{
+	return EEPROM.read(index * 2) | (EEPROM.read(index*2+1)<<8);
+}
+
+void WateringController::writeDayML(uint8_t index, uint16_t val)
+{
+	EEPROM.write(index*2, val &0xFF);
+	EEPROM.write(index*2+1, val>>8);
+}
+void WateringController::incDayML(uint8_t index, uint16_t inc)
+{
+	writeDayML(index, readDayML(index)+inc);
+}
 
 WateringController::WateringController(I2CExpander* _exp) {
 	init(_exp);
@@ -168,18 +182,22 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 	Serial1.print(" program: ");
 	Serial1.print(pot.wc.pgm, DEC);
 	if (pot.wc.pgm == 1) {
-		Serial1.print(" barrier value:");
-		Serial1.print(pot.pgm.const_hum.value, DEC);
-		Serial1.print(" cur value:");
-		Serial1.print(cur_value, DEC);
- 		if ( abs(cur_value - pot.pgm.const_hum.value) <= pot.sensor.noise_delta) {
-			Serial1.println(" wet enough;");
- 			should_water = false;
- 		} else {
-			should_water = (cur_value < pot.pgm.const_hum.value);
-			Serial1.print(" should_water:");
-			Serial1.print(should_water, DEC);
-			Serial1.println(';');
+		if (pot.pgm.const_hum.max_ml >= readDayML(index)) {
+			Serial1.println("day limit is out!");
+		} else {
+			Serial1.print(" barrier value:");
+			Serial1.print(pot.pgm.const_hum.value, DEC);
+			Serial1.print(" cur value:");
+			Serial1.print(cur_value, DEC);
+			if ( abs(cur_value - pot.pgm.const_hum.value) <= pot.sensor.noise_delta) {
+				Serial1.println(" wet enough;");
+				should_water = false;
+			} else {
+				should_water = (cur_value < pot.pgm.const_hum.value);
+				Serial1.print(" should_water:");
+				Serial1.print(should_water, DEC);
+				Serial1.println(';');
+			}
 		}
 //  		return should_water;
 	} else if (pot.wc.pgm == 2) {
@@ -189,34 +207,38 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 		Serial1.print(pot.pgm.hum_and_dry.max_value, DEC);
 		Serial1.print(" cur_value:");
 		Serial1.print(cur_value, DEC);
-		if( abs(cur_value - pot.pgm.hum_and_dry.min_value)<= pot.sensor.noise_delta || abs(cur_value - pot.pgm.hum_and_dry.max_value) <= pot.sensor.noise_delta) {
-			Serial1.print(" out of range, no actions");
-			should_water = false;
-		}
-
-		if ( pot.wc.state == 1) {
-			Serial.print(" drying ");
-			if ( cur_value < pot.pgm.hum_and_dry.min_value +  pot.sensor.noise_delta) {
-				pot.wc.state = 0;
-				g_cfg.savePot(index, pot);
-				Serial1.println(" end;");
-				should_water = true;
-			} else {
-				Serial1.println(" again;");
-				should_water = false;
-			}
+		if (pot.pgm.hum_and_dry.max_ml>= readDayML(index)) {
+			Serial1.println("day limit is out!");
 		} else {
-			Serial1.print(" wetting ");
-			if ( cur_value > pot.pgm.hum_and_dry.max_value - pot.sensor.noise_delta) {
-				Serial1.println(" wet enough. start drying;");
-				pot.wc.state = 1;
-				g_cfg.savePot(index, pot);
+			if( abs(cur_value - pot.pgm.hum_and_dry.min_value)<= pot.sensor.noise_delta || abs(cur_value - pot.pgm.hum_and_dry.max_value) <= pot.sensor.noise_delta) {
+				Serial1.print(" out of range, no actions");
 				should_water = false;
-			} else {
-				Serial1.println(" again;");
-				should_water = true;
 			}
-		}
+
+			if ( pot.wc.state == 1) {
+				Serial.print(" drying ");
+				if ( cur_value < pot.pgm.hum_and_dry.min_value +  pot.sensor.noise_delta) {
+					pot.wc.state = 0;
+					g_cfg.savePot(index, pot);
+					Serial1.println(" end;");
+					should_water = true;
+				} else {
+					Serial1.println(" again;");
+					should_water = false;
+				}
+			} else {
+				Serial1.print(" wetting ");
+				if ( cur_value > pot.pgm.hum_and_dry.max_value - pot.sensor.noise_delta) {
+					Serial1.println(" wet enough. start drying;");
+					pot.wc.state = 1;
+					g_cfg.savePot(index, pot);
+					should_water = false;
+				} else {
+					Serial1.println(" again;");
+					should_water = true;
+				}
+			}
+		}//if day limit is not reached
 	} else {//pgm == 2
 		Serial1.println("not implemented pgm;");
 	}
@@ -274,6 +296,7 @@ void WateringController::run_watering(bool real)
  				Serial1.println(';');
 				if (real) {
 					uint16_t ml = water_doser.pipi(pc.wc.x, pc.wc.y, pc.wc.ml);
+					incDayML(i * 8 + j, ml);
 				}
 				data &= ~(1<<j);
 				clock.writeRAMbyte(addr, data);
@@ -283,16 +306,26 @@ void WateringController::run_watering(bool real)
 	}
 }
 
-void WateringController::midnightTasks()
+void WateringController::cleanDayStat()
 {
-	potConfig pc;
-// 	wateringProgram wp;
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
-		pc = g_cfg.readPot(i);
-		uint8_t pgm = pc.wc.pgm;
-		if (pgm == 1 || pgm == 2) {
-			pc.wc.watered = 0;
-			g_cfg.savePot(i, pc);
+		writeDayML(i, 0);
+	}
+}
+
+void WateringController::printDayStat()
+{
+	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
+		potConfig pot = g_cfg.readPot(i);
+		Serial1.print(pot.name);
+		Serial1.print(":");
+		Serial1.print(readDayML(i), DEC);
+		Serial1.print("/");
+		if (pot.wc.pgm == 1) {
+			Serial1.print(pot.pgm.const_hum.max_ml, DEC);
+		} else if (pot.wc.pgm == 2) {
+			Serial1.print(pot.pgm.hum_and_dry.max_ml, DEC);
 		}
+		Serial1.println(";");
 	}
 }

@@ -26,6 +26,7 @@ PAGE		content
 #ifdef MY_ROOM
 	#define	WD_SIZE_X	3
 	#define WD_SIZE_Y	9
+	#define AQUARIUM_PIN	51
 #else
 	#define	WD_SIZE_X	3
 	#define WD_SIZE_Y	18
@@ -91,7 +92,7 @@ PAGE		content
 
 #define RAM_POT_STATE_ADDRESS_BEGIN		(13)
 #define RAM_POT_STATE_ADDRESS_END		(RAM_POT_STATE_ADDRESS_BEGIN + 4)
-#define RAM_WATER_STATS_BEGIN			(RAM_POT_STATE_ADDRESS_BEGIN + 5)
+#define RAM_WATER_STATS_BEGIN			(RAM_POT_STATE_ADDRESS_END + 1)
 // #define USE_OLD_WATERING_DRIVER
 
 // #define		USE_1WIRE
