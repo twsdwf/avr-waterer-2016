@@ -182,7 +182,7 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 	Serial1.print(" program: ");
 	Serial1.print(pot.wc.pgm, DEC);
 	if (pot.wc.pgm == 1) {
-		if (pot.pgm.const_hum.max_ml >= readDayML(index)) {
+		if (pot.pgm.const_hum.max_ml <= readDayML(index)) {
 			Serial1.println("day limit is out!");
 		} else {
 			Serial1.print(" barrier value:");
@@ -207,7 +207,7 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 		Serial1.print(pot.pgm.hum_and_dry.max_value, DEC);
 		Serial1.print(" cur_value:");
 		Serial1.print(cur_value, DEC);
-		if (pot.pgm.hum_and_dry.max_ml>= readDayML(index)) {
+		if (pot.pgm.hum_and_dry.max_ml <= readDayML(index)) {
 			Serial1.println("day limit is out!");
 		} else {
 			if( abs(cur_value - pot.pgm.hum_and_dry.min_value)<= pot.sensor.noise_delta || abs(cur_value - pot.pgm.hum_and_dry.max_value) <= pot.sensor.noise_delta) {

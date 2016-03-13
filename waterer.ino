@@ -317,6 +317,11 @@ bool doCommand(char*cmd)
 	} else if (IS("ping", cmd, 4)) {
 		Serial1.println("pong;");
 		print_now();
+#ifdef MY_ROOM
+		Serial1.println("MY_ROOM ver");
+#else
+		Serial1.println("BIG_ROOM ver");
+#endif
 		Serial1.print(__DATE__);
 		Serial1.println(';');
 	} else if (IS("time", cmd, 4)) {
@@ -541,7 +546,9 @@ void setup()
 	water_doser.begin();
 	Serial1.println("setup() end");
   	wctl.init(&i2cExpander);
+#ifdef MY_ROOM
 	pinMode(AQUARIUM_PIN, OUTPUT);
+#endif
   	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
 }
 

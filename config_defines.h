@@ -28,8 +28,8 @@ PAGE		content
 	#define WD_SIZE_Y	9
 	#define AQUARIUM_PIN	51
 #else
-	#define	WD_SIZE_X	3
-	#define WD_SIZE_Y	18
+	#define	WD_SIZE_X	7
+	#define WD_SIZE_Y	9
 #endif
 // #define WATER_STORAGE_PAGE				11
 
