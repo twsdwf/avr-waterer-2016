@@ -4,19 +4,19 @@ BOARD_TAG=atmega128
 BOARD_SUB=atmega128
 ISP_PROG=usbasp
 F_CPU=16000000L
-CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DBIG_ROOM
+CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DMY_ROOM
 ARDUINO_LIBS += BH1750 RTClib AT24Cxxx Wire PCF8574 MCP23017 EEPROM
 #-DMY_ROOM
-AVRDUDE_CONF = /root/arduino-1.6.5-r5/hardware/tools/avr/etc/avrdude.conf
-AVRDUDE = /root/arduino-1.6.5-r5/hardware/tools/avr/bin/avrdude
-ARDUINO_DIR=/root/arduino-1.6.5-r5
+AVRDUDE_CONF = /root/arduino-1.6.8/hardware/tools/avr/etc/avrdude.conf
+AVRDUDE = /root/arduino-1.6.8/hardware/tools/avr/bin/avrdude
+ARDUINO_DIR=/root/arduino-1.6.8
 ARDUINO_LIB_PATH=/ardugit/new_water/libs
 USER_LIB_PATH=/ardugit/new_water/libs
 ARDUINO_PLATFORM_LIB_PATH=/ardugit/new_water/libs
 include /ardugit/arduinomk/Arduino.mk
 
 
-#/root/arduino-1.6.5-r5/hardware/tools/avr/bin/avrdude -C/root/arduino-1.6.5-r5/hardware/tools/avr/etc/avrdude.conf -v -patmega328p -cusbasp -Pusb -Uflash:w:/tmp/build2373641797843774957.tmp/sketch_dec20a.cpp.hex:i
+#/root/arduino-1.6.8/hardware/tools/avr/bin/avrdude -C/root/arduino-1.6.8/hardware/tools/avr/etc/avrdude.conf -v -patmega328p -cusbasp -Pusb -Uflash:w:/tmp/build2373641797843774957.tmp/sketch_dec20a.cpp.hex:i
 # --- leonardo (or pro micro w/leo bootloader)
 #BOARD_TAG    = leonardo
 #MONITOR_PORT = /dev/ttyACM0

@@ -133,7 +133,8 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 // 	}
 	
 	delay(g_cfg.config.sensor_init_time);
-
+	Serial1.print(F("read dev #"));
+	Serial1.println(data->address, DEC);
 	for (uint8_t pin = 0; pin < 16; ++pin) {
 		this->write(PCF_PIN_INH, HIGH);
 		this->write(PCF_PIN_A, pin & 1);
@@ -141,16 +142,17 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 		this->write(PCF_PIN_C, pin & 4);
 		this->write(PCF_PIN_D, pin & 8);
 		this->write(PCF_PIN_INH, LOW);
+		data->pin_values[pin] = 0;
 		for(uint8_t i = 0; i < g_cfg.config.sensor_measures; ++i) {
 			delay(g_cfg.config.sensor_read_time);
 			data->pin_values[pin] += analogRead(AIN_PIN);
 		}
 		data->pin_values[pin] /= g_cfg.config.sensor_measures;
-// 		Serial1.print(data->address, DEC);
-// 		Serial1.print('/');
-// 		Serial1.print(pin, DEC);
-// 		Serial1.print(':');
-// 		Serial1.println(data->pin_values[pin], DEC);
+ 		Serial1.print(data->address, DEC);
+ 		Serial1.print(F("/"));
+ 		Serial1.print(pin, DEC);
+ 		Serial1.print(F(":"));
+ 		Serial1.println(data->pin_values[pin], DEC);
 		this->write(PCF_PIN_INH, HIGH);
 	}
 	if (should_off) {
@@ -164,17 +166,17 @@ bool I2CExpander::ping(bool print_out)
 	uint8_t dummy;
 	uint8_t rc = twi_writeTo(_address, &dummy, 0, 1, 0);
 	if (print_out) {
-		Serial1.print("expander ");
+		Serial1.print(F("expander "));
 		Serial1.print(_address, DEC);
 	}
 	if (rc) {
 		if (print_out) {
-			Serial1.println("is unavail");
+			Serial1.println(F("is unavail"));
 		}
 		return false;
 	} else {
 		if (print_out) {
-			Serial1.println(" is OK");
+			Serial1.println(F(" is OK"));
 		}
 		return true;
 	}

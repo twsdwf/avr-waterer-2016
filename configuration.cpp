@@ -88,7 +88,7 @@ bool Configuration::readGlobalConfig()
 	uint8_t buffer[32] = {0};
 	mem.readBuffer(GCFG_ADDRESS, (char*)buffer, 32);
 	if (buffer[0] != CONFIG_MAGIC) {
- 		Serial1.println("wrong magic num");
+ 		Serial1.println(F("wrong magic num"));
 		return false;
 	}
 	memcpy(&this->config, buffer + 2, sizeof(globalConfig));
@@ -113,9 +113,9 @@ potConfig Configuration::readPot(uint8_t index)
 	potConfig pc;
 	memset(pc.name, 0, POT_NAME_LENGTH);
 	if (index >= MAX_POTS || index < 0) {
-		Serial1.print("readPot:index ");
+		Serial1.print(F("readPot:index "));
 		Serial1.print(index, DEC);
-		Serial1.println(" out of bounds");
+		Serial1.println(F(" out of bounds"));
 		return pc;
 	}
 	mem.readBuffer(MEM_PAGE_SIZE *(POTS_DATA_PAGE0 + index), (char*)&pc, sizeof(pc));
@@ -126,9 +126,9 @@ potConfig Configuration::readPot(uint8_t index)
 bool Configuration::savePot(uint8_t index, potConfig& pc)
 {
 	if (index >= MAX_POTS || index < 0) {
-		Serial1.print("savePot:index ");
+		Serial1.print(F("savePot:index "));
 		Serial1.print(index, DEC);
-		Serial1.println(" out of bounds");
+		Serial1.println(F(" out of bounds"));
 		return false;
 	}
 	mem.writeBuffer(MEM_PAGE_SIZE *(POTS_DATA_PAGE0 + index), (char*)&pc, sizeof(potConfig));

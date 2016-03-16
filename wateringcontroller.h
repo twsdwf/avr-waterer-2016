@@ -6,7 +6,7 @@
 class WateringController{
 protected:
 	I2CExpander*i2cexp;
-	sensorValues*sv;
+	sensorValues _sensor_values[3];
 	uint8_t sv_count;
 	void writeDayML(uint8_t index, uint16_t val);
 	void incDayML(uint8_t index, uint16_t inc);

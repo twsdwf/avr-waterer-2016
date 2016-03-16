@@ -41,18 +41,74 @@ void WateringController::incDayML(uint8_t index, uint16_t inc)
 }
 
 WateringController::WateringController(I2CExpander* _exp) {
-	init(_exp);
-	sv=NULL;
+// 	init(_exp);
+// 	_sensor_values=NULL;
 }
 
 WateringController::~WateringController()
 {
-
+// 	if (_sensor_values) delete [] (_sensor_values);
 }
 
 void WateringController::init(I2CExpander* _exp)
 {
 	i2cexp = _exp;
+// 	_sensor_values = NULL;
+		uint8_t bits = 0, cp=0;
+		sv_count = 0;
+
+		// search how many expander device we have. var bits used for repeat tests.
+		for (int i = 0; i < g_cfg.config.pots_count; ++i) {
+			potConfig pot = g_cfg.readPot(i);
+			if ( !(bits & 1<<(pot.sensor.dev - 32))) {
+				bits |= 1<<(pot.sensor.dev - 32);
+				++sv_count;
+			}
+		}
+//  		Serial1.print("devices:");
+//  		Serial1.println(sv_count, DEC);
+		cp=0;
+		for (uint8_t i = 0; i < 8; ++i) {
+			if (bits & (1<<i)) {
+				_sensor_values[ cp ].address = 32 + i;
+// 				Serial1.print(i, DEC);
+// 				Serial1.print("/");
+// 				Serial1.print(cp, DEC);
+// 				Serial1.print(":");
+// 				Serial1.println(_sensor_values[cp].address, DEC);
+				++cp;
+			}
+		}
+		sv_count = cp;
+
+// 		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
+		/* strange shit: this does not work(malloc,memset and below)!
+		_sensor_values = new sensorValues[sv_count];
+		Serial1.print("sizeof=");
+		Serial1.print(sizeof(sensorValues), DEC);
+		Serial1.print(" addr=");
+		Serial1.println((int)_sensor_values, DEC);
+		memset(_sensor_values, 0, sizeof(sensorValues) * sv_count);
+		Serial1.println(_sensor_values[0].address);
+		Serial1.println(_sensor_values[1].address);
+		cp=0;
+		for (uint8_t i = 0; i < 8; ++i) {
+			if (bits & (1<<i)) {
+				_sensor_values[ cp ].address = 32 + i;
+				Serial1.print(i, DEC);
+				Serial1.print("/");
+				Serial1.print(cp, DEC);
+				Serial1.print(":");
+				Serial1.println(_sensor_values[cp].address, DEC);
+				++cp;
+			}
+		}
+		sv_count = cp;
+ 		Serial1.print("sv_count=");
+ 		Serial1.println(sv_count, DEC);
+		Serial1.print(" addr=");
+		Serial1.print((int)_sensor_values, DEC);
+	*/
 }
 
 int WateringController::run_checks()
@@ -62,40 +118,18 @@ int WateringController::run_checks()
  	for (int i = RAM_POT_STATE_ADDRESS_BEGIN; i < RAM_POT_STATE_ADDRESS_END; ++i) {
  		clock.writeRAMbyte(i, 0);
  	}//for i
- 	if (sv == NULL) {
-		uint8_t bits = 0, cp;
-		sv_count = 0;
-		/*
-		 * search how many expander device we have. var bits used for repeat tests.
-		 */
-		for (int i = 0; i < g_cfg.config.pots_count; ++i) {
-			potConfig pot = g_cfg.readPot(i);
-			if ( !(bits & 1<<(pot.sensor.dev - 32))) {
-				bits |= 1<<(pot.sensor.dev - 32);
-				++sv_count;
-			}
-		}
-// 		Serial1.print("devices:");
-// 		Serial1.println(sv_count, DEC);
-		sv = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
-		memset(sv, 0, sizeof(sensorValues)*sv_count);
-		for (uint8_t i = 0; i < 8; ++i) {
-			if (bits & (1<<i)) {
-				sv[cp++].address = 32 + i;
-				Serial1.println(32 + i, DEC);
-			}
-		}
-		sv_count = cp;
-// 		Serial1.print("sv_count=");
-// 		Serial1.println(sv_count, DEC);
-	}
 
 	i2cexp->i2c_on();
+// 	Serial1.print(" addr=");
+// 	Serial1.print((int)_sensor_values, DEC);
 	
 	for (uint8_t i = 0; i < sv_count; ++i) {
-		if (!i2cexp->readSensorValues(sv + i)) {
-			Serial1.print("ERROR while read sensors at address ");
-			Serial1.print((sv+i)->address, DEC);
+// 		Serial1.print("addr:");
+// 		Serial1.println(_sensor_values[i].address, DEC);
+		
+		if (!i2cexp->readSensorValues( &_sensor_values[i]) ) {
+			Serial1.print(F("ERROR while read sensors at address "));
+			Serial1.print((_sensor_values+i)->address, DEC);
 			Serial1.println(';');
 		}
 	}
@@ -129,29 +163,28 @@ void WateringController::doPotService(bool check_and_watering)
 	run_watering(check_and_watering);
 	
 	DateTime now2 = clock.now();
-	Serial1.print("watering time: ");
-	Serial1.print(now2.secondstime() - now.secondstime(), DEC);
-	Serial1.println("s;");
+ 	Serial1.print(F("watering time: "));
+ 	Serial1.print(now2.secondstime() - now.secondstime(), DEC);
+ 	Serial1.println(F("s;"));
 	last_check_time = now2.secondstime();
 	clock.writeRAMbyte(LAST_CHECK_TS_1, last_check_time >> 24);
 	clock.writeRAMbyte(LAST_CHECK_TS_2, last_check_time >> 16);
 	clock.writeRAMbyte(LAST_CHECK_TS_3, last_check_time >> 8);
 	clock.writeRAMbyte(LAST_CHECK_TS_4, last_check_time & 0xFF);
 	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
-	Serial1.println("watering end;");
+ 	Serial1.println(F("watering end;"));
 }
 
 int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 {
 	potConfig pot = g_cfg.readPot(index);
-	Serial1.print("checking pot ");
-	Serial1.print(index, DEC);
-	Serial1.print(' ');
-	Serial1.print(pot.name);
-	Serial1.println(';');
+ 	Serial1.print(F("checking pot "));
+ 	Serial1.print(index, DEC);
+ 	Serial1.print(F(" "));
+ 	Serial1.print(pot.name);
 	
 	if ( 0 == pot.wc.enabled ) {
-		Serial1.println(" is off;");
+		Serial1.println(F(" is off;"));
 		return -1;
 	}
 
@@ -162,8 +195,8 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 // 		Serial1.print(sv[i].address, DEC);
 // 		Serial1.print('/');
 // 		Serial1.println(pot.sensor.dev, DEC);
-		if ( sv[i].address == pot.sensor.dev) {
-			cur_value = sv[i].pin_values[ pot.sensor.pin ];
+		if ( _sensor_values[i].address == pot.sensor.dev) {
+			cur_value = _sensor_values[i].pin_values[ pot.sensor.pin ];
 			break;
 		}
 	}
@@ -171,81 +204,81 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result)
 	bool should_water = false;
 	
 	if (cur_value == -1) {
-		Serial1.print("ERROR: dev ");
+		Serial1.print(F("ERROR: dev "));
 		Serial1.print(pot.sensor.dev, DEC);
-		Serial1.print("/");
+		Serial1.print(F("/"));
 		Serial1.print(pot.sensor.pin, DEC);
-		Serial1.println("is not found in data!;");
+		Serial1.println(F("is not found in data!;"));
 		return -1;
 	}
 	pot.sensor.noise_delta = 10;
-	Serial1.print(" program: ");
+	Serial1.print(F(" program: "));
 	Serial1.print(pot.wc.pgm, DEC);
 	if (pot.wc.pgm == 1) {
 		if (pot.pgm.const_hum.max_ml <= readDayML(index)) {
-			Serial1.println("day limit is out!");
+			Serial1.println(F("day limit is out!"));
 		} else {
-			Serial1.print(" barrier value:");
+			Serial1.print(F(" barrier value:"));
 			Serial1.print(pot.pgm.const_hum.value, DEC);
-			Serial1.print(" cur value:");
+			Serial1.print(F(" cur value:"));
 			Serial1.print(cur_value, DEC);
 			if ( abs(cur_value - pot.pgm.const_hum.value) <= pot.sensor.noise_delta) {
-				Serial1.println(" wet enough;");
+				Serial1.println(F(" wet enough;"));
 				should_water = false;
 			} else {
 				should_water = (cur_value < pot.pgm.const_hum.value);
-				Serial1.print(" should_water:");
+				Serial1.print(F(" should_water:"));
 				Serial1.print(should_water, DEC);
 				Serial1.println(';');
 			}
 		}
 //  		return should_water;
 	} else if (pot.wc.pgm == 2) {
-		Serial1.print(" range ");
+		Serial1.print(F(" range "));
 		Serial1.print(pot.pgm.hum_and_dry.min_value, DEC);
-		Serial1.print("..");
+		Serial1.print(F(".."));
 		Serial1.print(pot.pgm.hum_and_dry.max_value, DEC);
-		Serial1.print(" cur_value:");
+		Serial1.print(F(" cur_value:"));
 		Serial1.print(cur_value, DEC);
 		if (pot.pgm.hum_and_dry.max_ml <= readDayML(index)) {
-			Serial1.println("day limit is out!");
+			Serial1.println(F("day limit is out!"));
 		} else {
 			if( abs(cur_value - pot.pgm.hum_and_dry.min_value)<= pot.sensor.noise_delta || abs(cur_value - pot.pgm.hum_and_dry.max_value) <= pot.sensor.noise_delta) {
-				Serial1.print(" out of range, no actions");
+				Serial1.print(F(" out of range, no actions"));
 				should_water = false;
 			}
 
 			if ( pot.wc.state == 1) {
-				Serial.print(" drying ");
+				Serial.print(F(" drying "));
 				if ( cur_value < pot.pgm.hum_and_dry.min_value +  pot.sensor.noise_delta) {
 					pot.wc.state = 0;
 					g_cfg.savePot(index, pot);
-					Serial1.println(" end;");
+					Serial1.println(F(" end;"));
 					should_water = true;
 				} else {
-					Serial1.println(" again;");
+					Serial1.println(F(" again;"));
 					should_water = false;
 				}
 			} else {
-				Serial1.print(" wetting ");
+				Serial1.print(F(" wetting "));
 				if ( cur_value > pot.pgm.hum_and_dry.max_value - pot.sensor.noise_delta) {
-					Serial1.println(" wet enough. start drying;");
+					Serial1.println(F(" wet enough. start drying;"));
 					pot.wc.state = 1;
 					g_cfg.savePot(index, pot);
 					should_water = false;
 				} else {
-					Serial1.println(" again;");
+					Serial1.println(F(" again;"));
 					should_water = true;
 				}
 			}
 		}//if day limit is not reached
 	} else {//pgm == 2
-		Serial1.println("not implemented pgm;");
+		Serial1.println(F("not implemented pgm;"));
 	}
 
-	Serial1.print("val=");
+	Serial1.print(F("val="));
 	Serial1.print(cur_value, DEC);
-	Serial1.print(" ");
+	Serial1.print(F(" "));
 	Serial1.print(should_water, DEC);
 	Serial1.println(';');
 
@@ -287,6 +320,9 @@ void WateringController::run_watering(bool real)
 		for (j = 0; j < 8; ++j) {
 			if (data & (1<<j)) {
 				potConfig pc = g_cfg.readPot( i * 8 + j);
+				if (pc.wc.enabled == 0) {
+					continue;
+				}
  				Serial1.print("watering to ");
 				Serial1.print(pc.name);
 				Serial1.print(' ');
@@ -318,14 +354,14 @@ void WateringController::printDayStat()
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		potConfig pot = g_cfg.readPot(i);
 		Serial1.print(pot.name);
-		Serial1.print(":");
+		Serial1.print(F(":"));
 		Serial1.print(readDayML(i), DEC);
-		Serial1.print("/");
+		Serial1.print(F("/"));
 		if (pot.wc.pgm == 1) {
 			Serial1.print(pot.pgm.const_hum.max_ml, DEC);
 		} else if (pot.wc.pgm == 2) {
 			Serial1.print(pot.pgm.hum_and_dry.max_ml, DEC);
 		}
-		Serial1.println(";");
+		Serial1.println(F(";"));
 	}
 }

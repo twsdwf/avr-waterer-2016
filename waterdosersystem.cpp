@@ -163,16 +163,17 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 
 void WaterDoserSystem::testAll()
 {
+	
 	for (uint8_t x = 0; x < WD_SIZE_X; ++x) {
 		for (uint8_t y = 0; y < WD_SIZE_Y; ++y) {
 			Serial1.print(x, DEC);
-			Serial1.print(" ");
+			Serial1.print(F(" "));
 			Serial1.print(y, DEC);
-			Serial1.println(';');
+			Serial1.println(F(";"));
 			if(!moveToPos(x,y)) {
 				parkY();
 				if (!moveToPos(x,y)) {
-					Serial1.println("error in y-pos");
+					Serial1.println(F("error in y-pos"));
 					return;
 				}
 			}
@@ -182,6 +183,7 @@ void WaterDoserSystem::testAll()
 // 			delay(500);
 		}
 	}
+	
 }
 
 void WaterDoserSystem::servoUp()
@@ -390,13 +392,13 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 		errcode = WDERR_WFS_DEAD;
  	}
 // 	Serial1.println(__LINE__, DEC);
- 	Serial1.println("end of measure");
+ 	Serial1.println(F("end of measure"));
  	Serial1.flush();
- 	Serial1.print("ticks:");
+ 	Serial1.print(F("ticks:"));
  	Serial1.print(ticks, DEC);
- 	Serial1.print("flag:[");
+ 	Serial1.print(F("flag:["));
  	Serial1.print(__wfs_flag, DEC);
- 	Serial1.println("]");
+ 	Serial1.println(F("]"));
  	Serial1.flush();
  	uint16_t _ml = round(__wfs_flag * 1000.0/(float)wftpl);
 	digitalWrite(VCC_PUMP_EN, LOW);
@@ -415,6 +417,7 @@ void WaterDoserSystem::haltPumps()
 
 void WaterDoserSystem::testES()
 {
+	/*
 	Serial1.print("X begin=");
 #ifdef MY_ROOM
 	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
@@ -439,11 +442,11 @@ void WaterDoserSystem::testES()
 
 	Serial1.print("Z begin=");
 	Serial1.println(analogRead(6), DEC);
-
+*/
 }
 bool WaterDoserSystem::park()
 {
-	testES();
+// 	testES();
 	uint8_t bits = 0x03;
 	fwdX();
 	fwdY();
@@ -490,7 +493,7 @@ bool WaterDoserSystem::park()
 			bits &= 0xFD;
 		}
 	}
-	testES();
+// 	testES();
 	return true;
 }
 
@@ -505,7 +508,7 @@ bool WaterDoserSystem::parkX()
 	}
 #else
 	while (analogRead(X_BEGIN_PIN - A0) <= (X_BEGIN_STOPVAL*1.1) ) {
-		Serial1.print("fwdX es:");
+		Serial1.print(F("fwdX es:"));
 		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		fwdX();
 	}
@@ -520,12 +523,12 @@ bool WaterDoserSystem::parkX()
 	}
 #else
 	while(analogRead(X_BEGIN_PIN - A0) >= X_BEGIN_STOPVAL) {
-		Serial1.print("bwdX es:");
+		Serial1.print(F("bwdX es:"));
 		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		bwdX();
 	}
 	while(analogRead(X_BEGIN_PIN - A0) <= X_BEGIN_STOPVAL) {
-		Serial1.print("fwd2 X es:");
+		Serial1.print(F("fwd2 X es:"));
 		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		fwdX();
 	}
@@ -568,6 +571,9 @@ bool WaterDoserSystem::parkY()
 
 bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 {
+	if (x > WD_SIZE_X || y > WD_SIZE_Y) {
+		return false;
+	}
 /*
 	Serial1.print("cur pos (");
 	Serial1.print(cur_x, DEC);
@@ -649,17 +655,17 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (cur_x == -1) {
 				if (digitalRead(X_STEP_PIN) && digitalRead(X_STEP_PIN) ) {
 					++cur_x;
-  					Serial1.print("at x#1:");
- 					Serial1.println(cur_x, DEC);
+//   					Serial1.print("at x#1:");
+//  					Serial1.println(cur_x, DEC);
 					xs = ((cur_x < x) ? WDST_WAIT_LO_FWD/*2*/ : WDST_STOP/*0*/);
-  					Serial1.print("xs=");
-  					Serial1.println(xs, DEC);
+//   					Serial1.print("xs=");
+//   					Serial1.println(xs, DEC);
 					x_ms = millis();
 				}
 				
 				if (xs == WDST_STOP/*0*/) {
-  					Serial1.print("finished x#1 at ");
-  					Serial1.println(cur_x, DEC);
+//   					Serial1.print("finished x#1 at ");
+//   					Serial1.println(cur_x, DEC);
 					stopX();
 				}
 			} else {
@@ -667,15 +673,15 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				if (digitalRead(X_STEP_PIN) == HIGH) {
 					if (millis() - x_ms > MIN_MOVE_TIME_BTW) {
 						++cur_x;
-  						Serial1.print("at x#2:");
-  						Serial1.println(cur_x, DEC);
+//   						Serial1.print("at x#2:");
+//   						Serial1.println(cur_x, DEC);
 						x_ms = millis();
 						xs = ((cur_x < x) ? /*2*/WDST_WAIT_LO_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
 				if (xs == WDST_STOP/*0*/) {
-  					Serial1.print("finished x#2 at ");
-  					Serial1.println(cur_x, DEC);
+//   					Serial1.print("finished x#2 at ");
+//   					Serial1.println(cur_x, DEC);
 					stopX();
 				}//is xs == 0
 			}//else if cur_x > -1
@@ -686,7 +692,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (analogRead(X_BEGIN_PIN-A0) <= X_BEGIN_STOPVAL)
 #endif
 			{
-				Serial1.println("ERROR: x at start");
+// 				Serial1.println("ERROR: x at start");
 				stopX();
 				stopY();
 				return false;
@@ -765,7 +771,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (analogRead(Y_BEGIN_PIN-A0)<= Y_BEGIN_STOPVAL)
 #endif
 			{
-				Serial1.println("ERROR: y at start");
+				Serial1.println(F("ERROR: y at start"));
 				stopX();
 				stopY();
 				return false;
@@ -809,7 +815,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	
 	while (cur_x < x) {
 		if (!nextX()) {
-			Serial1.println("ERROR in X-pos;");
+			Serial1.println(F("ERROR in X-pos;"));
 			errcode = WDERR_POS_ERR;
 			return false;
 		}
@@ -817,13 +823,13 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	
 	while(cur_y < y) {
 		if (!nextY()) {
-			Serial1.println("ERROR in Y-pos;");
+			Serial1.println(F("ERROR in Y-pos;"));
 			errcode = WDERR_POS_ERR;
 			return false;
 		}
 	}
 	
- 	Serial1.println("done");
+ 	Serial1.println(F("done"));
 #endif
 	return true;
 }
@@ -833,14 +839,14 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 {
 	errcode = 0;
 	if(!this->moveToPos(x, y)) {
-		Serial1.println("ERROR while positioning;");
+		Serial1.println(F("ERROR while positioning;"));
 		return 0;
 	}
 	servoDown();
 	if (errcode > 0) {
-		Serial1.print("STOP due fatal error ");
+		Serial1.print(F("STOP due fatal error "));
 		Serial1.print(errcode, DEC);
-		Serial1.println(';');
+		Serial1.println(F(";"));
 		return false;
 	}
 	pinMode(AIR_PIN, OUTPUT);
@@ -848,7 +854,7 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 // 	this->init_measure();
 	uint16_t ret_ml = this->measure(ml, 5000);
 	Serial1.print(ret_ml, DEC);
-	Serial1.println(';');
+	Serial1.println(F(";"));
 	dope(at);
 	servoUp();
 // 	delay(500);

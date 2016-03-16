@@ -180,6 +180,10 @@ inline void wcfg_set_program(wateringConfig& wc, uint8_t program)
 // 		pot.wc.flags |= WCFG_STATE_DRYING;
 // 	}
 // }
+inline int IS_P(char*cmd, const char*pgm_str, uint8_t n)
+{
+	return 0==strncmp_P(cmd, pgm_str, n);
+}
 
 inline int IS(char*cmd, char*x, uint8_t n)
 {
