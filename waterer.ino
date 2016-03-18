@@ -223,7 +223,25 @@ bool doCommand(char*cmd)
 		}
 		Serial1.println("done;");
 	} else */
-	if (IS_P(cmd, PSTR("stat"), 4)) {
+	if (IS_P(cmd, PSTR("sdump"), 5)) {
+// 		wctl.run_checks();
+		wctl.dumpSensorValues();
+	} else if (IS_P(cmd, PSTR("pcf"), 3)) {
+		char*ptr = cmd + 4;
+		int c,p,v;
+		set_field<int>(c, &ptr);
+		set_field<int>(p, &ptr);
+		set_field<int>(v, &ptr);
+		Serial1.print(F("pcf set "));
+		Serial1.print(c, DEC);
+		Serial1.print(F("/"));
+		Serial1.print(p, DEC);
+		Serial1.print(F("="));
+		Serial1.print(v, DEC);
+		i2cExpander.i2c_on();
+		i2cExpander.begin(c);
+		i2cExpander.write(p,v);
+	} else if (IS_P(cmd, PSTR("stat"), 4)) {
 		if (IS_P(cmd+5, PSTR("clr"), 3)) {
 			wctl.cleanDayStat();
 		} else if (IS_P(cmd + 5, PSTR("get"), 3)) {
@@ -294,9 +312,16 @@ bool doCommand(char*cmd)
 		water_doser.moveToPos(x, y);
 	} else if (IS_P(cmd, PSTR("iic"), 3)) {
 		i2cExpander.i2c_on();
-		if (IS_P(cmd + 4, PSTR("scan"), 4)) {
-			uint8_t addr = PCF8574_ADDRESS;
-			while (i2cExpander.findNext(addr, PCF8574_ADDRESS+8, &addr)) {
+		if (IS_P(cmd+4, PSTR("off"), 3)) {
+			i2cExpander.i2c_off();
+		} else if (IS_P(cmd + 4, PSTR("scan"), 4)) {
+			uint8_t addr = 1;
+			while (i2cExpander.findNext(32, 32+7, &addr)) {
+				Serial1.print(addr,DEC);
+				Serial1.print(F(","));
+				++addr;
+			}
+			while (i2cExpander.findNext(56, 56+7, &addr)) {
 				Serial1.print(addr,DEC);
 				Serial1.print(F(","));
 				++addr;
@@ -558,7 +583,7 @@ void loop()
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
 	if (now_m > 2400) {
-		Serial1.println(F("bad time read"));
+// 		Serial1.println(F("bad time read"));
 		return;
 	}
 #ifdef MY_ROOM

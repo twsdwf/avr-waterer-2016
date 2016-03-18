@@ -54,61 +54,82 @@ void WateringController::init(I2CExpander* _exp)
 {
 	i2cexp = _exp;
 // 	_sensor_values = NULL;
-		uint8_t bits = 0, cp=0;
+		uint8_t bits = 0, bitsa=0, cp=0;
 		sv_count = 0;
 
 		// search how many expander device we have. var bits used for repeat tests.
 		for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 			potConfig pot = g_cfg.readPot(i);
-			if ( !(bits & 1<<(pot.sensor.dev - 32))) {
-				bits |= 1<<(pot.sensor.dev - 32);
-				++sv_count;
+			if (pot.sensor.dev >=32 && pot.sensor.dev <=39) {
+				if ( !(bits & 1<<(pot.sensor.dev - 32))) {
+					bits |= 1<<(pot.sensor.dev - 32);
+					++sv_count;
+				}
+			} else if (pot.sensor.dev >=56 && pot.sensor.dev <=56+7) {
+				if ( !(bitsa & 1<<(pot.sensor.dev - 56))) {
+					bitsa |= 1<<(pot.sensor.dev - 56);
+					++sv_count;
+				}
 			}
 		}
-//  		Serial1.print("devices:");
-//  		Serial1.println(sv_count, DEC);
-		cp=0;
-		for (uint8_t i = 0; i < 8; ++i) {
-			if (bits & (1<<i)) {
-				_sensor_values[ cp ].address = 32 + i;
-// 				Serial1.print(i, DEC);
-// 				Serial1.print("/");
-// 				Serial1.print(cp, DEC);
-// 				Serial1.print(":");
-// 				Serial1.println(_sensor_values[cp].address, DEC);
-				++cp;
-			}
+//   		Serial1.print(F("devices:"));
+//   		Serial1.println(sv_count, DEC);
+		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
+		if (_sensor_values == 0) {
+			Serial1.println(F("FATAL ERROR: malloc() failed;"));
+			return;
 		}
-		sv_count = cp;
 
-// 		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
-		/* strange shit: this does not work(malloc,memset and below)!
-		_sensor_values = new sensorValues[sv_count];
-		Serial1.print("sizeof=");
-		Serial1.print(sizeof(sensorValues), DEC);
-		Serial1.print(" addr=");
-		Serial1.println((int)_sensor_values, DEC);
-		memset(_sensor_values, 0, sizeof(sensorValues) * sv_count);
-		Serial1.println(_sensor_values[0].address);
-		Serial1.println(_sensor_values[1].address);
-		cp=0;
+		memset(_sensor_values, 0, sizeof(sensorValues)*sv_count);
+
+		uint8_t index = 0;
+		
 		for (uint8_t i = 0; i < 8; ++i) {
+			if (index < sv_count && _sensor_values[index].address!=0) {
+				Serial1.println(F("ERROR: possible stack roof broken!;"));
+			}
 			if (bits & (1<<i)) {
-				_sensor_values[ cp ].address = 32 + i;
-				Serial1.print(i, DEC);
-				Serial1.print("/");
-				Serial1.print(cp, DEC);
-				Serial1.print(":");
-				Serial1.println(_sensor_values[cp].address, DEC);
-				++cp;
+				_sensor_values[ index ].address = 32 + i;
+				++index;
+			}
+			if (bitsa & (1<<i)) {
+				_sensor_values[ index ].address = 56 + i;
+				++index;
 			}
 		}
-		sv_count = cp;
- 		Serial1.print("sv_count=");
- 		Serial1.println(sv_count, DEC);
-		Serial1.print(" addr=");
-		Serial1.print((int)_sensor_values, DEC);
-	*/
+}
+
+void WateringController::dumpSensorValues()
+{
+	i2cexp->i2c_on();
+// 	Serial1.print(" addr=");
+// 	Serial1.print((int)_sensor_values, DEC);
+
+	for (uint8_t i = 0; i < sv_count; ++i) {
+// 		Serial1.print("addr:");
+// 		Serial1.println(_sensor_values[i].address, DEC);
+
+		if (!i2cexp->readSensorValues( &_sensor_values[i]) ) {
+// 			Serial1.print(F("ERROR while read sensors at address "));
+// 			Serial1.print((_sensor_values+i)->address, DEC);
+// 			Serial1.println(';');
+		}
+	}
+	i2cexp->i2c_off();
+	for (uint8_t i = 0; i < sv_count; ++i) {
+		Serial1.print(_sensor_values[i].address, DEC);
+		Serial1.print(':');
+		for(uint8_t j=0;j<16;++j) {
+			Serial1.print(_sensor_values[i].pin_values[j], DEC);
+			if (j<15) {
+				Serial1.print(',');
+			}
+		}
+		Serial1.print(';');
+		Serial1.flush();
+	}
+	Serial1.print(';');
+	Serial1.flush();
 }
 
 int WateringController::run_checks()
