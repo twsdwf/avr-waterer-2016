@@ -1,6 +1,9 @@
 #ifndef _CONFIG_DEFINES_INCLUDED_
 #define _CONFIG_DEFINES_INCLUDED_
 
+#define ESP_BUF_SIZE	128
+
+
 #define MEM_PAGE_SIZE		32
 #define MEM_PAGES			2048 /*65K mem*/
 
