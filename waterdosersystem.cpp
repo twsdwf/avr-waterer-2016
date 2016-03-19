@@ -146,15 +146,18 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	cur_y = 0xFF;
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
+
+	return;
 	
- 	servoDown();
-  	servoUp();
+	servoDown();
+	servoUp();
+	park();
+
 // 	while(1){
 // 		testES();
 // 		delay(1500);
 // 	}
 // #ifdef MY_ROOM
-  	park();
 // #else
 //   	parkY();
 //   	parkX();
@@ -206,7 +209,7 @@ void WaterDoserSystem::servoUp()
 	digitalWrite(VCC_PUMP_EN, LOW);
 }
 
-void WaterDoserSystem::servoDown()
+bool WaterDoserSystem::servoDown()
 {
 	pinMode(VCC_PUMP_EN, OUTPUT);
 	digitalWrite(VCC_PUMP_EN, HIGH);
@@ -221,6 +224,7 @@ void WaterDoserSystem::servoDown()
 #else
 	while (analogRead(6) < 500);
 #endif
+	return false;
 	//anti-stick system.would be great to add down-pos sensor optocoupler, but I'm so lazy...
 	int repeats = 0;
 #ifdef MY_ROOM
@@ -237,10 +241,11 @@ void WaterDoserSystem::servoDown()
 		++repeats;
 		if (repeats > 6) {
 			errcode = WDERR_STICKED;
-			break;
+			return false;
 		}
 	}
 	delay(500);
+	return true;
 // 	digitalWrite(Z_AXE_EN, LOW);
 }
 
@@ -842,7 +847,10 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 		Serial1.println(F("ERROR while positioning;"));
 		return 0;
 	}
-	servoDown();
+	if (!servoDown()) {
+		Serial1.println(F("ERROR: Z-axe fault"));
+		return 0;
+	}
 	if (errcode > 0) {
 		Serial1.print(F("STOP due fatal error "));
 		Serial1.print(errcode, DEC);

@@ -40,7 +40,7 @@ public:
 	bool parkX();
 	bool parkY();
 	void servoUp();
-	void servoDown();
+	bool servoDown();
 	void servoUnbind();
 	void testES();
 	void testAll();

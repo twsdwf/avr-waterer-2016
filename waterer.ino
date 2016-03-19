@@ -315,13 +315,14 @@ bool doCommand(char*cmd)
 		if (IS_P(cmd+4, PSTR("off"), 3)) {
 			i2cExpander.i2c_off();
 		} else if (IS_P(cmd + 4, PSTR("scan"), 4)) {
-			uint8_t addr = 1;
-			while (i2cExpander.findNext(32, 32+7, &addr)) {
+			uint8_t addr = 32;
+			while (i2cExpander.findNext(addr, 32+7, &addr)) {
 				Serial1.print(addr,DEC);
 				Serial1.print(F(","));
 				++addr;
 			}
-			while (i2cExpander.findNext(56, 56+7, &addr)) {
+			addr = 56;
+			while (i2cExpander.findNext(addr, 56+7, &addr)) {
 				Serial1.print(addr,DEC);
 				Serial1.print(F(","));
 				++addr;
