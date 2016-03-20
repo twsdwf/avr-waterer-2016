@@ -16,7 +16,7 @@ public:
 	virtual ~WateringController();
 	void init(I2CExpander* _exp);
 	int run_checks();
-	void dumpSensorValues();
+	void dumpSensorValues(char*output);
 	int8_t check_pot_state(int8_t index, bool save_result = true);
 // 	bool check_watering_program(uint8_t pot_index, potConfig& pot, uint32_t cur_value);
 // 	void read_watering_program(uint8_t pot_index, wateringProgram& wpgm);

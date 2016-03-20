@@ -141,17 +141,17 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	digitalWrite(Y_AXE_DIR, LOW);
 	digitalWrite(Y_AXE_DIR2, LOW);
 	digitalWrite(Y_AXE_EN, LOW);
-	
+	Serial1.println(analogRead(6), DEC);
 	cur_x = 0xFF;
 	cur_y = 0xFF;
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 
-	return;
+// 	return;
 	
-	servoDown();
-	servoUp();
-	park();
+ 	servoDown();
+ 	servoUp();
+ 	park();
 
 // 	while(1){
 // 		testES();
@@ -201,7 +201,9 @@ void WaterDoserSystem::servoUp()
  #ifdef MY_ROOM
 	while (analogRead(6) < 200);
  #else
-	while (analogRead(6) > 300);
+	while (analogRead(6) > 300){
+		Serial1.println(analogRead(6), DEC);
+	}
  #endif
 	digitalWrite(Z_AXE_DIR, LOW);
 	digitalWrite(Z_AXE_EN, LOW);
@@ -224,7 +226,7 @@ bool WaterDoserSystem::servoDown()
 #else
 	while (analogRead(6) < 500);
 #endif
-	return false;
+// 	return false;
 	//anti-stick system.would be great to add down-pos sensor optocoupler, but I'm so lazy...
 	int repeats = 0;
 #ifdef MY_ROOM
@@ -409,7 +411,6 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 	digitalWrite(VCC_PUMP_EN, LOW);
 // 	ws.dec(ws_index, ml);
  	return _ml;
-
 }
 
 void WaterDoserSystem::haltPumps()
@@ -422,7 +423,7 @@ void WaterDoserSystem::haltPumps()
 
 void WaterDoserSystem::testES()
 {
-	/*
+/*	
 	Serial1.print("X begin=");
 #ifdef MY_ROOM
 	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
@@ -447,11 +448,12 @@ void WaterDoserSystem::testES()
 
 	Serial1.print("Z begin=");
 	Serial1.println(analogRead(6), DEC);
-*/
+	*/
+
 }
 bool WaterDoserSystem::park()
 {
-// 	testES();
+ 	testES();
 	uint8_t bits = 0x03;
 	fwdX();
 	fwdY();
@@ -498,7 +500,7 @@ bool WaterDoserSystem::park()
 			bits &= 0xFD;
 		}
 	}
-// 	testES();
+ 	testES();
 	return true;
 }
 
@@ -579,6 +581,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 	if (x > WD_SIZE_X || y > WD_SIZE_Y) {
 		return false;
 	}
+	servoUp();
 /*
 	Serial1.print("cur pos (");
 	Serial1.print(cur_x, DEC);
@@ -855,10 +858,11 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 		Serial1.print(F("STOP due fatal error "));
 		Serial1.print(errcode, DEC);
 		Serial1.println(F(";"));
-		return false;
+		return 0;
 	}
+// 	Serial1.println(F("pipi"));
 	pinMode(AIR_PIN, OUTPUT);
-	digitalWrite(AIR_PIN, HIGH);
+// 	digitalWrite(AIR_PIN, HIGH);
 // 	this->init_measure();
 	uint16_t ret_ml = this->measure(ml, 5000);
 	Serial1.print(ret_ml, DEC);

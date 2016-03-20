@@ -152,4 +152,4 @@ void Configuration::midnight_tasks()
 }
 
 Configuration g_cfg;
-char*str=(char*)malloc(80);
+char*str = (char*)malloc(100);

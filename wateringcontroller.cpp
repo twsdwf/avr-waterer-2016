@@ -99,7 +99,7 @@ void WateringController::init(I2CExpander* _exp)
 		}
 }
 
-void WateringController::dumpSensorValues()
+void WateringController::dumpSensorValues(char*output)
 {
 	i2cexp->i2c_on();
 // 	Serial1.print(" addr=");
@@ -116,20 +116,30 @@ void WateringController::dumpSensorValues()
 		}
 	}
 	i2cexp->i2c_off();
+	char *ptr = output;
 	for (uint8_t i = 0; i < sv_count; ++i) {
-		Serial1.print(_sensor_values[i].address, DEC);
-		Serial1.print(':');
+		ptr += sprintf(ptr, "%d:", _sensor_values[i].address);
+// 		Serial1.print(_sensor_values[i].address, DEC);
+// 		Serial1.print(':');
 		for(uint8_t j=0;j<16;++j) {
-			Serial1.print(_sensor_values[i].pin_values[j], DEC);
+			ptr += sprintf(ptr, "%d", _sensor_values[i].address);
+// 			Serial1.print(_sensor_values[i].pin_values[j], DEC);
 			if (j<15) {
-				Serial1.print(',');
+				*ptr = ',';
+				++ptr;
+// 				ptr += sprintf(ptr, ",");
+// 				Serial1.print(',');
 			}
 		}
-		Serial1.print(';');
-		Serial1.flush();
+		*ptr = ';'
+		++ptr;
+// 		Serial1.print(';');
+// 		Serial1.flush();
 	}
-	Serial1.print(';');
-	Serial1.flush();
+	*ptr = ';'
+	++ptr;
+// 	Serial1.print(';');
+// 	Serial1.flush();
 }
 
 int WateringController::run_checks()

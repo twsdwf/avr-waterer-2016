@@ -1,8 +1,13 @@
 #ifndef _CONFIG_DEFINES_INCLUDED_
 #define _CONFIG_DEFINES_INCLUDED_
 
-#define ESP_BUF_SIZE	128
-
+#ifdef MY_ROOM
+	#define VERSION_TYPE "MY_ROOM"
+#else
+	#define VERSION_TYPE "BIG_ROOM"
+#endif
+#define ESP_BUF_SIZE	64
+#define ESP_RST_PIN		9
 
 #define MEM_PAGE_SIZE		32
 #define MEM_PAGES			2048 /*65K mem*/
