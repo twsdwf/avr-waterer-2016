@@ -15,16 +15,16 @@ public:
 	WateringController(I2CExpander* _exp=NULL);
 	virtual ~WateringController();
 	void init(I2CExpander* _exp);
-	int run_checks();
-	void dumpSensorValues(char*output);
-	int8_t check_pot_state(int8_t index, bool save_result = true);
+	int run_checks(HardwareSerial* output);
+	void dumpSensorValues(HardwareSerial*output);
+	int8_t check_pot_state(int8_t index, bool save_result, HardwareSerial* output);
 // 	bool check_watering_program(uint8_t pot_index, potConfig& pot, uint32_t cur_value);
 // 	void read_watering_program(uint8_t pot_index, wateringProgram& wpgm);
 // 	void write_watering_program(uint8_t pot_index, wateringProgram& wpgm);
-	void doPotService(bool check_and_watering = true);
-	void run_watering(bool real=true);
+	void doPotService(bool check_and_watering, HardwareSerial*output);
+	void run_watering(bool real, HardwareSerial* output);
 	void cleanDayStat();
-	void printDayStat();
+	void printDayStat(HardwareSerial*output);
 };
 
 

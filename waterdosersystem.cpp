@@ -152,7 +152,46 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
  	servoDown();
  	servoUp();
  	park();
+	/*
+Y fwd: 8 pos at 35135
 
+Y
+ bwd: 8 pos at 36493
+
+X fwd: 2 pos at 10629
+
+X bwd: 2 pos at 10434
+
+mixed fwd: (0,0)-(2,2) at 10271
+
+m
+ixed bwd: (2,2)-(0,0) pos at 10271
+	moveToPos(0,0);
+	uint32_t start = millis();
+	moveToPos(0, 8);
+	Serial1.print(F("Y fwd: 8 pos at "));
+	Serial1.println(millis()-start, DEC);
+	start = millis();
+	moveToPos(0,0);
+	Serial1.print(F("Y bwd: 8 pos at "));
+	Serial1.println(millis()-start, DEC);
+	start = millis();
+	moveToPos(2, 0);
+	Serial1.print(F("X fwd: 2 pos at "));
+	Serial1.println(millis()-start, DEC);
+	start = millis();
+	moveToPos(0,0);
+	Serial1.print(F("X bwd: 2 pos at "));
+	Serial1.println(millis()-start, DEC);
+	start = millis();
+	moveToPos(2,2);
+	Serial1.print(F("mixed fwd: (0,0)-(2,2) at "));
+	Serial1.println(millis()-start, DEC);
+	start = millis();
+	moveToPos(0,0);
+	Serial1.print(F("mixed bwd: (2,2)-(0,0) pos at "));
+	Serial1.println(millis()-start, DEC);
+	*/
 // 	while(1){
 // 		testES();
 // 		delay(1500);

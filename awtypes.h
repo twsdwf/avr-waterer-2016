@@ -252,10 +252,10 @@ inline void get_h_m_from_timefield(uint16_t& time, uint8_t&h, uint8_t&m)
 }
 
 
-template<typename field_type> void print_field(field_type field, char terminator=',')
+template<typename field_type> void print_field(HardwareSerial* output, field_type field, char terminator=',')
 {
-	Serial1.print(field);
-	Serial1.print(terminator);
+	output->print(field);
+	output->print(terminator);
 }
 
 template<typename field_type> bool set_field(field_type& field, char**ptr)

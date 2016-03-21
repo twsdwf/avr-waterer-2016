@@ -104,66 +104,52 @@ void scanFunc( byte addr, byte result )
 // 	Serial1.print( (result==0) ? " found!":"       ");
 }
 
-void print_now()
+void print_now(HardwareSerial* output)
 {
 	char*week_days[] = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
 	DateTime ts = clock.now();
-	Serial1.print(ts.day(), DEC);
-	Serial1.print(F("."));
-	Serial1.print(ts.month(), DEC);
-	Serial1.print(F("."));
-	Serial1.print(ts.year(), DEC);
-	Serial1.print(F(" "));
-	Serial1.print(week_days[ts.dayOfWeek()-1]);
-	Serial1.print(F(" "));
-	Serial1.print(ts.hour(), DEC);
-	Serial1.print(F(":"));
-	Serial1.print(ts.minute(), DEC);
-	Serial1.print(F(":"));
-	Serial1.print(ts.second(), DEC);
-	Serial1.println(';');
+	output->print(ts.day(), DEC);
+	output->print(F("."));
+	output->print(ts.month(), DEC);
+	output->print(F("."));
+	output->print(ts.year(), DEC);
+	output->print(F(" "));
+	output->print(week_days[ts.dayOfWeek()-1]);
+	output->print(F(" "));
+	output->print(ts.hour(), DEC);
+	output->print(F(":"));
+	output->print(ts.minute(), DEC);
+	output->print(F(":"));
+	output->print(ts.second(), DEC);
+	output->println(';');
 }
 
-void dumpPotConfig(uint8_t index, char*output)
+void dumpPotConfig(uint8_t index, HardwareSerial* output)
 {
 	//pot set <index>,<flags>,<dev>,<pin>,<x>,<y>,<name>,<airTime>,<state>,<enabled>,<ml>,<pgm>,<param1>[,param2][,param3]...;
 	potConfig pot = g_cfg.readPot(index);
-	char*ptr = output;
-	ptr += sprintf(output, "%d,%d,%d,%d,%d,\"%s\",%d,%d,%d,%d,%d,",
-				index,
-				pot.sensor.dev,
-				pot.sensor.pin,
-				pot.wc.x,
-				pot.wc.y,
-				pot.name,
-				pot.wc.airTime,
-				pot.wc.state,
-		 pot.wc.enabled,
-		 pot.wc.ml,
-		 pot.wc.pgm);
-// 	print_field<uint8_t>(index);
-// 	print_field<uint8_t>(pot.sensor.dev);
-// 	print_field<uint8_t>(pot.sensor.pin);
-//  	print_field<uint8_t>((uint8_t)pot.wc.x);
-//  	print_field<uint8_t>((uint8_t)pot.wc.y);
-// 	Serial1.print(pot.name);
-// 	Serial1.print(',');
-// 	print_field<uint8_t>(pot.wc.airTime);
-// 	print_field<uint8_t>(pot.wc.state);
-// 	print_field<uint8_t>(pot.wc.enabled);
-// 	print_field<uint8_t>(pot.wc.ml);
-// 	print_field<uint8_t>(pot.wc.pgm);
+	print_field<uint8_t>(output, index);
+// 	print_field<uint8_t>(pot.sensor.flags);
+	print_field<uint8_t>(output, pot.sensor.dev);
+	print_field<uint8_t>(output, pot.sensor.pin);
+ 	print_field<uint8_t>(output, (uint8_t)pot.wc.x);
+ 	print_field<uint8_t>(output, (uint8_t)pot.wc.y);
+	output->print(pot.name);
+	output->print(',');
+	print_field<uint8_t>(output, pot.wc.airTime);
+	print_field<uint8_t>(output, pot.wc.state);
+	print_field<uint8_t>(output, pot.wc.enabled);
+	print_field<uint8_t>(output, pot.wc.ml);
+	print_field<uint8_t>(output, pot.wc.pgm);
 	if (pot.wc.pgm == 1) {
-		sprintf(ptr, "%d,%d;\r\n", pot.pgm.const_hum.value, pot.pgm.const_hum.max_ml);
-// 		print_field<uint16_t>(pot.pgm.const_hum.value);
-// 		print_field<uint16_t>(pot.pgm.const_hum.max_ml,';');
+		print_field<uint16_t>(output, pot.pgm.const_hum.value);
+		print_field<uint16_t>(output, pot.pgm.const_hum.max_ml,';');
 	} else if (pot.wc.pgm == 2) {
-		sprintf(ptr, "%d,%d,%d;\r\n", pot.pgm.hum_and_dry.min_value, pot.pgm.hum_and_dry.min_value, pot.pgm.hum_and_dry.max_ml);
-// 		print_field<uint16_t>(pot.pgm.hum_and_dry.min_value);
-// 		print_field<uint16_t>(pot.pgm.hum_and_dry.max_value);
-// 		print_field<uint16_t>(pot.pgm.hum_and_dry.max_ml,';');
+		print_field<uint16_t>(output, pot.pgm.hum_and_dry.min_value);
+		print_field<uint16_t>(output, pot.pgm.hum_and_dry.max_value);
+		print_field<uint16_t>(output, pot.pgm.hum_and_dry.max_ml,';');
 	} else {
-		Serial1.print(F("???"));
+		output->print(F("???"));
 	}// 	print_field<uint32_t>(pot.sensor.dry_freq);
 // 	print_field<uint32_t>(pot.sensor.wet_freq);
 // 	print_field<uint32_t>(pot.sensor.no_soil_freq);
@@ -177,25 +163,22 @@ void dumpPotConfig(uint8_t index, char*output)
 }
 
 
-char* printGcfg(char*ptr)
+void printGcfg(HardwareSerial*output)
 {
-	char*cp = ptr;
 	uint16_t val = (uint16_t)g_cfg.config.enabled;
 // 	print_field<uint16_t>(val);
 	val = (uint16_t)g_cfg.config.flags;
-	cp += sprintf(cp, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d;",val,
-					g_cfg.config.pots_count,
-					g_cfg.config.i2c_pwron_timeout,
-					g_cfg.config.sensor_init_time,
-					g_cfg.config.sensor_read_time,
-					g_cfg.config.water_start_time,
-					g_cfg.config.water_end_time,
-					g_cfg.config.water_start_time_we,
-					g_cfg.config.water_end_time_we,
-					g_cfg.config.sensor_measures,
-					g_cfg.config.test_interval
-				);
-	return cp;
+	print_field<uint16_t>(output, val);
+	print_field<uint8_t>(output, g_cfg.config.pots_count);
+	print_field<uint16_t>(output, g_cfg.config.i2c_pwron_timeout);
+	print_field<uint16_t>(output, g_cfg.config.sensor_init_time);
+	print_field<uint16_t>(output, g_cfg.config.sensor_read_time);
+	print_field<uint16_t>(output, g_cfg.config.water_start_time);
+	print_field<uint16_t>(output, g_cfg.config.water_end_time);
+	print_field<uint16_t>(output, g_cfg.config.water_start_time_we);
+	print_field<uint16_t>(output, g_cfg.config.water_end_time_we);
+	print_field<uint8_t>(output, g_cfg.config.sensor_measures);
+	print_field<uint8_t>(output, g_cfg.config.test_interval, ';');
 /*			set_field<uint16_t>(val, &ptr);
 			g_cfg.config.flags = val;
 			g_cfg.config.enabled = val & 1;
@@ -211,7 +194,7 @@ char* printGcfg(char*ptr)
 */
 }
 
-bool doCommand(char*cmd)
+bool doCommand(char*cmd, HardwareSerial*output)
 {
 	static const char time_read_fmt[] /*PROGMEM*/ = "%d:%d:%d %d.%d.%d %d";
 	/*if (IS(cmd,"er", 2)) {
@@ -244,48 +227,48 @@ bool doCommand(char*cmd)
 	} else */
 	if (IS_P(cmd, PSTR("sdump"), 5)) {
 // 		wctl.run_checks();
-		wctl.dumpSensorValues(str);
-	} /*else if (IS_P(cmd, PSTR("pcf"), 3)) {
+		wctl.dumpSensorValues(output);
+	} else if (IS_P(cmd, PSTR("pcf"), 3)) {
 		char*ptr = cmd + 4;
 		int c,p,v;
 		set_field<int>(c, &ptr);
 		set_field<int>(p, &ptr);
 		set_field<int>(v, &ptr);
-		Serial1.print(F("pcf set "));
-		Serial1.print(c, DEC);
-		Serial1.print(F("/"));
-		Serial1.print(p, DEC);
-		Serial1.print(F("="));
-		Serial1.print(v, DEC);
+		output->print(F("pcf set "));
+		output->print(c, DEC);
+		output->print(F("/"));
+		output->print(p, DEC);
+		output->print(F("="));
+		output->print(v, DEC);
 		i2cExpander.i2c_on();
 		i2cExpander.begin(c);
 		i2cExpander.write(p,v);
-	} */else if (IS_P(cmd, PSTR("stat"), 4)) {
+	} else if (IS_P(cmd, PSTR("stat"), 4)) {
 		if (IS_P(cmd+5, PSTR("clr"), 3)) {
 			wctl.cleanDayStat();
 		} else if (IS_P(cmd + 5, PSTR("get"), 3)) {
-			wctl.printDayStat();
+			wctl.printDayStat(output);
 		}
 	} else if (IS_P(cmd, PSTR("lux"), 3)) {
 #ifdef MY_ROOM
 		if (cmd[4]=='?') {
-			Serial1.print(F("lux:"));
-			Serial1.println(lightMeter.readLightLevel(), DEC);
+			output->print(F("lux:"));
+			output->println(lightMeter.readLightLevel(), DEC);
 		} else if (cmd[3] == '=') {
 			g_cfg.config.lux_barrier_value = atoi(cmd+5);
 			g_cfg.writeGlobalConfig();
 			g_cfg.readGlobalConfig();
-			Serial1.print(F("new lux value="));
-			Serial1.println(g_cfg.config.lux_barrier_value, DEC);
+			output->print(F("new lux value="));
+			output->println(g_cfg.config.lux_barrier_value, DEC);
 		}
 #endif
 	} else if (IS_P(cmd, PSTR("A"), 1)) {
-		Serial1.println(analogRead(cmd[1]-'0'), DEC);
+		output->println(analogRead(cmd[1]-'0'), DEC);
 	} else if (IS_P(cmd, PSTR("+"), 1)) {
 		int pin = atoi(cmd+1);
 		if(pin > 2) {
-			Serial1.print(F("HIGH pin:"));
-			Serial1.println(pin, DEC);
+			output->print(F("HIGH pin:"));
+			output->println(pin, DEC);
 			pinMode(pin, OUTPUT);
 			digitalWrite(pin, HIGH);
 		}
@@ -303,10 +286,10 @@ bool doCommand(char*cmd)
 		set_field<uint8_t>(ml, &ptr);
 		water_doser.pipi(x,y,ml, atMedium);
 	} else if (IS_P(cmd, PSTR("WSZ"), 3)) {
-		Serial1.print(WD_SIZE_X);
-		Serial1.print(F(","));
-		Serial1.print(WD_SIZE_Y);
-		Serial1.println(';');
+		output->print(WD_SIZE_X);
+		output->print(F(","));
+		output->print(WD_SIZE_Y);
+		output->println(';');
 	} else if (cmd[0]== 'U') {
 		water_doser.servoUp();
 	}else if (cmd[0]=='D') {
@@ -325,9 +308,9 @@ bool doCommand(char*cmd)
 		int x,y;
 		set_field<int>(x, &ptr);
 		set_field<int>(y, &ptr);
-		Serial1.print(x, DEC);
-		Serial1.print(F(" "));
-		Serial1.print(y, DEC);
+		output->print(x, DEC);
+		output->print(F(" "));
+		output->print(y, DEC);
 		water_doser.moveToPos(x, y);
 	} else if (IS_P(cmd, PSTR("iic"), 3)) {
 		i2cExpander.i2c_on();
@@ -336,43 +319,43 @@ bool doCommand(char*cmd)
 		} else if (IS_P(cmd + 4, PSTR("scan"), 4)) {
 			uint8_t addr = 32;
 			while (i2cExpander.findNext(addr, 32+7, &addr)) {
-				Serial1.print(addr,DEC);
-				Serial1.print(F(","));
+				output->print(addr,DEC);
+				output->print(F(","));
 				++addr;
 			}
 			addr = 56;
 			while (i2cExpander.findNext(addr, 56+7, &addr)) {
-				Serial1.print(addr,DEC);
-				Serial1.print(F(","));
+				output->print(addr,DEC);
+				output->print(F(","));
 				++addr;
 			}
-			Serial1.println(F("0;"));
+			output->println(F("0;"));
 		} else if (isdigit(*(cmd+4))) {
 			int dev=-1,pin=-1;
 			char *ptr = cmd + 4;
 			set_field<int>(dev, &ptr);
 			set_field<int>(pin, &ptr);
-			Serial1.print(dev, DEC);
-			Serial1.print(F(","));
-			Serial1.print(pin, DEC);
-			Serial1.print(F(","));
-			Serial1.print(i2cExpander.read_pin(dev,pin), DEC);
-			Serial1.println(F(";"));
+			output->print(dev, DEC);
+			output->print(F(","));
+			output->print(pin, DEC);
+			output->print(F(","));
+			output->print(i2cExpander.read_pin(dev,pin), DEC);
+			output->println(F(";"));
 		}
 		i2cExpander.i2c_off();
 	} else if (IS_P(cmd, PSTR("ping"), 4)) {
-		sprintf(str, "pong %s %s %s;\r\n", VERSION_TYPE, __DATE__, __TIME__);
-// 		Serial1.println(F("pong;"));
-// 		print_now();
-// #ifdef MY_ROOM
-// 		Serial1.println(F("MY_ROOM ver"));
-// #else
-// 		Serial1.println(F("BIG_ROOM ver"));
-// #endif
-// 		Serial1.print(__DATE__);
-// 		Serial1.println(F(" "));
-// 		Serial1.print(__TIME__);
-// 		Serial1.println(F(";"));
+		output->println(F("pong;"));
+		Serial1.println(F("pong;"));
+		print_now(output);
+#ifdef MY_ROOM
+		output->println(F("MY_ROOM ver"));
+#else
+		output->println(F("BIG_ROOM ver"));
+#endif
+		output->print(__DATE__);
+		output->println(F(" "));
+		output->print(__TIME__);
+		output->println(F(";"));
 	} else if (IS_P(cmd, PSTR("time"), 4)) {
 		if (IS_P(cmd+5, PSTR("get"), 3)) {
 		} else if (IS_P(cmd+5, PSTR("set"), 3)) {
@@ -387,28 +370,32 @@ bool doCommand(char*cmd)
 		}else if(IS_P(cmd+5,PSTR("adj"), 3)) {
 			DateTime now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
-			print_now();
+			print_now(output);
 		} else {
 			return false;
 		}
-		print_now();
+		print_now(output);
 	} else if (IS_P(cmd, PSTR("pot"), 3)) {
 		if (IS_P(cmd + 4, PSTR("get"), 3)) {
-			/*if (IS_P(cmd+4+4, PSTR("count"), 5)) {
-				Serial1.print(g_cfg.config.pots_count, DEC);
-				Serial1.println(";");
-			} else */if (isdigit(*(cmd+4+4))) {
+			if (IS_P(cmd+4+4, PSTR("count"), 5)) {
+				output->print(g_cfg.config.pots_count, DEC);
+				output->println(";");
+			} else if(IS_P(cmd+4+4, PSTR("all"), 3)) {
+				for (uint8_t i = 0; i < g_cfg.config.pots_count; ++i ) {
+					dumpPotConfig(i, output);
+				}
+			} else if (isdigit(*(cmd+4+4))) {
 				int index = -1;
 				char *ptr = cmd + 8;
 				set_field<int>(index, &ptr);
 				if (index >=0 && index < g_cfg.config.pots_count) {
-					dumpPotConfig(index, str);
+					dumpPotConfig(index, output);
 				} else {
 					return false;
 				}
 			}
 		} else if (IS_P(cmd + 4 , PSTR("set"), 3)) {
-			/*if (IS_P(cmd + 8, PSTR("count"), 5)) {
+			if (IS_P(cmd + 8, PSTR("count"), 5)) {
 				uint8_t tmp;
 				char*ptr=cmd+8+6;
 // 				Serial1.print("str:");
@@ -419,9 +406,9 @@ bool doCommand(char*cmd)
 // 				Serial1.println(tmp, DEC);
 				g_cfg.config.pots_count = tmp;
 				g_cfg.writeGlobalConfig();
-				Serial1.println(F("OK;"));
+				output->println(F("OK;"));
 				return true;
-			}*/
+			}
          //pot set <index:0>,<dev:1>,<pin:2>,<x:3>,<y:4>,<name:5>,<airTime:6>,<state:7>,<enabled:8>,<ml:9>,<pgm:10>,<param1:11>[,param2][,param3]...,<daymax>;
          //pot set 0,34,1,0,0,euc x1,2,0,1,30,1,700,500
 			uint8_t tmp, index;
@@ -450,27 +437,26 @@ bool doCommand(char*cmd)
 			pc.wc.ml = tmp;
 			set_field<uint8_t>(tmp, &ptr);
 			pc.wc.pgm = tmp;
-// 			Serial1.print(F("pgm="));
-// 			Serial1.println(pc.wc.pgm, DEC);
+			output->print(F("pgm="));
+			output->println(pc.wc.pgm, DEC);
 			if (pc.wc.pgm == 1) {
 				set_field<uint16_t>(pc.pgm.const_hum.value, &ptr);
 				set_field<uint16_t>(pc.pgm.const_hum.max_ml, &ptr);
-// 				Serial1.print(pc.pgm.const_hum.value, DEC);
-// 				Serial1.print(F(" daymax="));
-// 				Serial1.println(pc.pgm.const_hum.max_ml, DEC);
+				Serial1.print(pc.pgm.const_hum.value, DEC);
+				output->print(F(" daymax="));
+				output->println(pc.pgm.const_hum.max_ml, DEC);
 			} else if (pc.wc.pgm == 2) {
 				set_field<uint16_t>(pc.pgm.hum_and_dry.min_value, &ptr);
 				set_field<uint16_t>(pc.pgm.hum_and_dry.max_value, &ptr);
 				set_field<uint16_t>(pc.pgm.hum_and_dry.max_ml, &ptr);
-// 				Serial1.print(pc.pgm.hum_and_dry.min_value, DEC);
-// 				Serial1.print(F(".."));
-// 				Serial1.print(pc.pgm.hum_and_dry.max_value, DEC);
-// 				Serial1.print(F(" daymax="));
-// 				Serial1.println(pc.pgm.hum_and_dry.max_ml, DEC);
+				output->print(pc.pgm.hum_and_dry.min_value, DEC);
+				output->print(F(".."));
+				output->print(pc.pgm.hum_and_dry.max_value, DEC);
+				output->print(F(" daymax="));
+				output->println(pc.pgm.hum_and_dry.max_ml, DEC);
 			}
 			g_cfg.savePot(index, pc);
-			sprintf(str, "OK;\r\n");
-// 			Serial1.println(F("OK;"));
+			output->println(F("OK;"));
 			/*
 typedef struct wateringConfig{
 	uint8_t	x:3;
@@ -488,7 +474,7 @@ typedef struct wateringConfig{
 		
 	} else if (IS_P(cmd, PSTR("cfg"), 3)) {
 		if (IS_P(cmd + 4, PSTR("get"), 3)) {
-			printGcfg(str);
+			printGcfg(output);
 		} else if (IS_P(cmd + 4, PSTR("set"), 3)) {
 			//print_field<uint16_t>(gcfg.config.enabled);
 			char *ptr = cmd + 4 + 4;
@@ -507,18 +493,19 @@ typedef struct wateringConfig{
 			set_field<uint8_t>(g_cfg.config.sensor_measures, &ptr);
 			set_field<uint8_t>(g_cfg.config.test_interval, &ptr);	
 			g_cfg.writeGlobalConfig();
+// 			printGcfg();
 			g_cfg.readGlobalConfig();
-			printGcfg(str);
+			printGcfg(output);
 		}
 	} else if (IS_P(cmd, PSTR("start"), 5)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 		g_cfg.config.enabled = 1;
 		g_cfg.writeGlobalConfig();
-		Serial1.println(F("started;"));
+		output->println(F("started;"));
 	} else if (IS_P(cmd, PSTR("stop"), 4)) {
 		g_cfg.config.enabled = 0;
 		g_cfg.writeGlobalConfig();
- 		Serial1.println(F("halted;"));
+ 		output->println(F("halted;"));
 	} else if (IS_P(cmd, PSTR("restart"), 7)) {
 		last_check_time = 0;
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
@@ -528,22 +515,24 @@ typedef struct wateringConfig{
 		clock.writeRAMbyte(LAST_CHECK_TS_4, 0);
 		g_cfg.config.enabled = 1;
 		g_cfg.writeGlobalConfig();
- 		Serial1.println(F("restarted;"));
+ 		output->println(F("restarted;"));
 	} else if(IS_P(cmd, PSTR("force"), 5)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
-		wctl.doPotService(true);
+		wctl.doPotService(true, output);
 	} else if(IS_P(cmd,PSTR("testall") ,7)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
-		wctl.doPotService(false);
+		wctl.doPotService(false, output);
 	}
 	return true;
 }
+
+static char cmdbuf[64]={0};
 
 void checkCommand()
 {
 	if (!Serial1.available()) return;
 	static int i = 0;
-	static char cmdbuf[64]={0}, ch;
+	static char /*cmdbuf[64]={0},*/ ch;
 	while (Serial1.available()) {
 		ch = Serial1.read();
 		if (ch < 32) continue;
@@ -553,7 +542,7 @@ void checkCommand()
 // 			Serial1.print("cmd=[");
 // 			Serial1.print(cmdbuf);
 // 			Serial1.println("]");
-			doCommand(cmdbuf);
+			doCommand(cmdbuf, &Serial1);
 			i = 0;
 		} else {
 			cmdbuf[i++] = ch;
@@ -581,46 +570,23 @@ void processPacket(char*cmd)
 		return;
 	}
 	str[0] = 0;
-	uint16_t len = 0;
-	if (IS_P(ptr, PSTR("cfg"), 3)) {
-		if (IS_P(ptr + 4, PSTR("set"), 3)) {
-			
-		} else if (IS_P(ptr + 4, PSTR("get"), 3)) {
-// 			Serial1.println(F("cfg get cmd"));
-			len = sprintf(str, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d;\0",
-							g_cfg.config.flags,
-							g_cfg.config.pots_count,
-							g_cfg.config.i2c_pwron_timeout,
-							g_cfg.config.sensor_init_time,
-							g_cfg.config.sensor_read_time,
-		   
-							g_cfg.config.water_start_time,
-							g_cfg.config.water_end_time,
-							g_cfg.config.water_start_time_we,
-							g_cfg.config.water_end_time_we,
-							g_cfg.config.sensor_measures,
-							g_cfg.config.test_interval
-				   );
-		}
-	} else if (IS_P(ptr, PSTR("ping"), 4)) {
-// 		Serial1.println(F("ping cmd"));
-		len = sprintf(str, "pong %s %s %s", VERSION_TYPE, __DATE__, __TIME__);
-// 		esp8266.sendCmd(str, true, "SEND OK", 5000, true, true);
-	} else if (IS_P(ptr, PSTR("pot"), 3)) {
-		
-	}
-	
-	if (str[0]) {
-		char buf[24];
-		sprintf(buf, "AT+CIPSEND=%d,%d\r\n", link_id, len);
-		if (!esp8266.sendCmd(buf, true, ">", 4000, true)) {
-// 			Serial1.println(F("ERROR: cnx fault"));
+	memset(cmdbuf, 0, sizeof(cmdbuf));
+	strncpy(cmdbuf, ptr, min(strlen(ptr), sizeof(cmdbuf)) );
+	Serial1.print(F("get cmd ["));
+	Serial1.print(cmdbuf);
+	Serial1.println(F("]"));
+	sprintf(str, "AT+CIPSENDEX=%d,2020\r\n", link_id);
+		if (!esp8266.sendCmd(str, true, ">", 4000, true)) {
+ 			Serial1.println(F("ERROR: cnx fault"));
 			return;
 		} else {
-// 			Serial1.println(F("cnx is OK"));
+			doCommand(cmdbuf, &Serial);
+			Serial.print("\\0");
+			Serial.write(0);
+			esp8266.sendCmd_P(PSTR(""), true, PSTR("SEND OK"), 4000);
+// 			sprintf(str, "AT+CIPCLOSE=%d\r\n", link_id);
+// 			esp8266.sendCmd(str, true, "OK", 4000, true);
 		}
-		esp8266.sendCmd(str, true, "SEND OK", 5000, true);
-	}
 }
 #endif
 
@@ -644,7 +610,7 @@ void setup()
 
    	g_cfg.begin();
  	g_cfg.readGlobalConfig();
-return;
+// return;
 // 	g_cfg.config.enabled = 0;
   	wctl.init(&i2cExpander);
 
@@ -679,7 +645,7 @@ void loop()
 	if (now_m > 2400 || now.year() < 2016) {
 		now = esp8266.getTimeFromNTPServer();
 		clock.adjust(now);
-		print_now();
+		print_now(&Serial1);
 // 		Serial1.println(F("bad time read"));
 		return;
 	}
@@ -720,7 +686,7 @@ void loop()
 */
 		if ((now.secondstime() - last_check_time > 30 * 60) || iForceWatering) {
 
- 			wctl.doPotService(1);
+ 			wctl.doPotService(1, &Serial1);
 
 			iForceWatering = 0;
 		}
