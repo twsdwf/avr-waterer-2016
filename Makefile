@@ -4,7 +4,7 @@ BOARD_TAG=atmega128
 BOARD_SUB=atmega128
 ISP_PROG=usbasp
 F_CPU=16000000L
-CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DMY_ROOM
+CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DBIG_ROOM
 ARDUINO_LIBS += BH1750 RTClib AT24Cxxx Wire PCF8574 MCP23017 EEPROM
 #-DMY_ROOM
 AVRDUDE_CONF = /root/arduino-1.6.8/hardware/tools/avr/etc/avrdude.conf

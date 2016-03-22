@@ -367,11 +367,15 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			DateTime td(y, m, d, h, mi, s, dow);
 			clock.adjust(td);
 			delay(1000);
-		}else if(IS_P(cmd+5,PSTR("adj"), 3)) {
+		}
+#ifdef MY_ROOM
+		else if(IS_P(cmd+5,PSTR("adj"), 3)) {
 			DateTime now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
 			print_now(output);
-		} else {
+		}
+#endif
+		else {
 			return false;
 		}
 		print_now(output);
@@ -638,14 +642,18 @@ void loop()
 {
 	PORTE = PINE ^ (1<<2);
    	checkCommand();
+#ifdef MY_ROOM	
 	esp8266.process();
+#endif
 //  	return;
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
 	if (now_m > 2400 || now.year() < 2016) {
+#ifdef MY_ROOM
 		now = esp8266.getTimeFromNTPServer();
 		clock.adjust(now);
 		print_now(&Serial1);
+#endif
 // 		Serial1.println(F("bad time read"));
 		return;
 	}
@@ -706,8 +714,10 @@ void loop()
 // 		Serial1.println("g_cfg.midnight_tasks(); ended");
 // 		Serial1.flush();
 		midnight_skip = true;
+#ifdef MY_ROOM
 		now = esp8266.getTimeFromNTPServer();
 		clock.adjust(now);
+#endif
 	}
 // 		- last_check_time > g_cfg.config.
 //  	Serial1.println("ping");

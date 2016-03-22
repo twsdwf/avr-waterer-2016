@@ -6,7 +6,7 @@
 #else
 	#define VERSION_TYPE "BIG_ROOM"
 #endif
-#define ESP_BUF_SIZE	64
+#define ESP_BUF_SIZE	100
 #define ESP_RST_PIN		9
 
 #define MEM_PAGE_SIZE		32

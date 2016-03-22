@@ -141,16 +141,16 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	digitalWrite(Y_AXE_DIR, LOW);
 	digitalWrite(Y_AXE_DIR2, LOW);
 	digitalWrite(Y_AXE_EN, LOW);
-	Serial1.println(analogRead(6), DEC);
+#ifndef MY_ROOM
+ 	Serial1.println(analogRead(6), DEC);
+#endif
 	cur_x = 0xFF;
 	cur_y = 0xFF;
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 
-// 	return;
-	
- 	servoDown();
- 	servoUp();
+	servoDown();
+	servoUp();
  	park();
 	/*
 Y fwd: 8 pos at 35135
@@ -230,20 +230,34 @@ void WaterDoserSystem::testAll()
 
 void WaterDoserSystem::servoUp()
 {
+	errcode = 0;
 	pinMode(VCC_PUMP_EN, OUTPUT);
 	digitalWrite(VCC_PUMP_EN, HIGH);
-	
+	pinMode(A6, INPUT);
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 	digitalWrite(Z_AXE_EN, HIGH);
 	digitalWrite(Z_AXE_DIR, LOW);//UP
+	uint32_t start = millis();
  #ifdef MY_ROOM
-	while (analogRead(6) < 200);
+	while (analogRead(6) < 200 && (millis() - start < 10000UL))
  #else
-	while (analogRead(6) > 300){
-		Serial1.println(analogRead(6), DEC);
-	}
+	while (analogRead(6) > 300 && (millis() - start < 10000UL))
  #endif
+	{
+		pinMode(VCC_PUMP_EN, OUTPUT);
+		digitalWrite(VCC_PUMP_EN, HIGH);
+ 		Serial1.println(analogRead(6), DEC);
+	}
+ #ifdef MY_ROOM
+	if (analogRead(6) < 200)
+ #else
+	if (analogRead(6) > 300)
+ #endif
+	{
+		errcode = WDERR_STICKED;
+	}
+
 	digitalWrite(Z_AXE_DIR, LOW);
 	digitalWrite(Z_AXE_EN, LOW);
 	
@@ -252,6 +266,7 @@ void WaterDoserSystem::servoUp()
 
 bool WaterDoserSystem::servoDown()
 {
+	pinMode(A6, INPUT);
 	pinMode(VCC_PUMP_EN, OUTPUT);
 	digitalWrite(VCC_PUMP_EN, HIGH);
 	delay(100);
@@ -263,7 +278,9 @@ bool WaterDoserSystem::servoDown()
  #ifdef MY_ROOM
 	while (analogRead(6) > 100 && millis() - start < 1000);
 #else
-	while (analogRead(6) < 500);
+	while (analogRead(6) < 500 && millis() - start < 1000) {
+		Serial1.println(analogRead(6), DEC);
+	}
 #endif
 // 	return false;
 	//anti-stick system.would be great to add down-pos sensor optocoupler, but I'm so lazy...
@@ -273,6 +290,9 @@ bool WaterDoserSystem::servoDown()
 #else
 	while (analogRead(6) < 500) {
 #endif
+		pinMode(VCC_PUMP_EN, OUTPUT);
+		digitalWrite(VCC_PUMP_EN, HIGH);
+
 		digitalWrite(Z_AXE_EN, HIGH);
 		digitalWrite(Z_AXE_DIR, LOW);
 		delay(2000);
@@ -621,6 +641,10 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		return false;
 	}
 	servoUp();
+	if (errcode) {
+		Serial1.println(F("no move due Z-axe errors"));
+		return false;
+	}
 /*
 	Serial1.print("cur pos (");
 	Serial1.print(cur_x, DEC);
