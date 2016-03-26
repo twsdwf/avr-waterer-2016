@@ -55,6 +55,7 @@ public:
 	void _doser_halt();
 	uint16_t pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at=atMedium);
 	void resetDefaults();
+	coords curPos();
 };
 
 #endif

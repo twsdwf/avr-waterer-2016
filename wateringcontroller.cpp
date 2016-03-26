@@ -321,7 +321,12 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result, Hardw
 // {
 // 	g_cfg.write_watering_program(pot_index, wpgm);
 // }
-// 
+//
+float distance(const coords& a, const coords& b)
+{
+	return sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+}
+
 void WateringController::run_watering(bool real, HardwareSerial* output)
 {
 	uint8_t data = 0;
@@ -329,14 +334,11 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 // 	water_doser.prepareWatering();
 	output->print("real watering:");
 	output->println(real, DEC);
-	uint8_t i = 0;
+	uint8_t i = 0, ip = 0;
+	
+	coords pts[32];
 	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr) {
 		data = clock.readRAMbyte(addr);
- 		output->print("read byte ");
- 		output->print(addr, DEC);
- 		output->print(" ");
- 		output->print(data, BIN);
-		output->println(';');
 		int j = 0;
 		for (j = 0; j < 8; ++j) {
 			if (data & (1<<j)) {
@@ -344,9 +346,94 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				if (pc.wc.enabled == 0) {
 					continue;
 				}
+				pts[ip].x = pc.wc.x;
+				pts[ip].y = pc.wc.y;
+				pts[ip].index = i * 8 + j;
+				Serial1.print("[");
+				Serial1.print(pts[ip].index, DEC);
+				Serial1.println("]");
+				++ip;
 			}
 		}
 	}
+// 	Serial1.print(F("pots to water:"));
+// 	Serial1.println(ip, DEC);
+	
+	if (ip <= 0) {
+		return;
+	}
+
+	coords cur = water_doser.curPos();
+	int cd = 1000,ci=-1;
+// 	uint32_t start = millis();
+
+	do {
+		cd = 1000;
+		ci = -1;
+		float d;
+		for (int i=0; i < ip; ++i) {
+			d = distance(pts[i], cur);
+// 			Serial1.print(F("distance btw ("));
+// 			Serial1.print(cur.x, DEC);
+// 			Serial1.print(F(","));
+// 			Serial1.print(cur.y, DEC);
+// 			Serial1.print(F(") and ("));
+// 			Serial1.print(pts[i].x, DEC);
+// 			Serial1.print(F(","));
+// 			Serial1.print(pts[i].y, DEC);
+// 			Serial1.print(F(") = "));
+// 			Serial1.println(d);
+			if ( d < cd) {
+				cd = d;
+				ci = i;
+			}
+		}
+ 		Serial1.print(F("ci="));
+ 		Serial1.println(ci, DEC);
+		if ( ci > -1) {
+			Serial1.print(" (");
+			Serial1.print(pts[ci].x);
+			Serial1.print(",");
+			Serial1.print(pts[ci].y);
+			Serial1.print(") ");
+			Serial1.print(pts[ci].index);
+			potConfig pc = g_cfg.readPot(pts[ci].index);
+			
+			if (pc.wc.enabled) {
+// 				continue;
+				output->print("watering to ");
+				output->print(pc.name);
+				output->print(' ');
+				output->print(pts[ci].x, DEC);
+				output->print(',');
+				output->print(pts[ci].y, DEC);
+				output->println(';');
+				if (real) {
+					uint16_t ml = water_doser.pipi(pts[ci].x, pts[ci].y, pc.wc.ml);
+					incDayML(pts[ci].index, ml);
+				} else {
+					water_doser.moveToPos(pts[ci].x, pts[ci].y);
+					water_doser.servoDown();
+					water_doser.servoUp();
+				}
+			}
+			data = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (ci/8));
+			data &= ~(1<<(ci % 8));
+			clock.writeRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (ci/8), data);
+			cur = pts[ ci ];
+			pts[ ci ] = pts[ip - 1];
+			--ip;
+		} else {
+// 			Serial1.println(F("next pos not found"));
+// 			Serial1.println(ip, DEC);
+			break;
+		}
+	}  while (ip > 0);
+ 	Serial1.println(F("end of watering"));
+// 	Serial1.println(millis()-start);
+	
+// 	qsort(pts, ip, sizeof(uint8_t), ptsCmp);
+/*
 	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr) {
 		data = clock.readRAMbyte(addr);
  		output->print("read byte ");
@@ -378,6 +465,7 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 		}
 		++i;
 	}
+	*/
 }
 
 void WateringController::cleanDayStat()

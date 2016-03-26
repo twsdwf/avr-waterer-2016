@@ -52,6 +52,8 @@ extern "C" {
 
 #ifdef MY_ROOM
 	BH1750 lightMeter;
+#endif
+#ifdef USE_ESP8266
 	ESP8266 esp8266(&Serial);
 #endif
 volatile uint32_t last_check_time = 0;
@@ -368,7 +370,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			clock.adjust(td);
 			delay(1000);
 		}
-#ifdef MY_ROOM
+#ifdef USE_ESP8266
 		else if(IS_P(cmd+5,PSTR("adj"), 3)) {
 			DateTime now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
@@ -380,7 +382,25 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		}
 		print_now(output);
 	} else if (IS_P(cmd, PSTR("pot"), 3)) {
-		if (IS_P(cmd + 4, PSTR("get"), 3)) {
+		if (IS_P(cmd + 4, PSTR("find"), 4)) {
+			int chip=-1, pin=-1;
+			char*ptr=cmd+4+5;
+			set_field<int>(chip, &ptr);
+			set_field<int>(pin, &ptr);
+			if (chip > 0 && pin > -1) {
+				for (uint8_t i = 0; i < g_cfg.config.pots_count; ++i ) {
+					potConfig pc = g_cfg.readPot(i);
+					if (pc.sensor.dev == chip && pc.sensor.pin == pin) {
+						dumpPotConfig(i, output);
+						pin = 33;
+						break;
+					}
+				}
+				if(pin != 33) {
+					output->println(F("not found;"));
+				}
+			}
+		} else if (IS_P(cmd + 4, PSTR("get"), 3)) {
 			if (IS_P(cmd+4+4, PSTR("count"), 5)) {
 				output->print(g_cfg.config.pots_count, DEC);
 				output->println(";");
@@ -649,7 +669,7 @@ void loop()
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
 	if (now_m > 2400 || now.year() < 2016) {
-#ifdef MY_ROOM
+#ifdef USE_ESP8266
 		now = esp8266.getTimeFromNTPServer();
 		clock.adjust(now);
 		print_now(&Serial1);
@@ -714,7 +734,7 @@ void loop()
 // 		Serial1.println("g_cfg.midnight_tasks(); ended");
 // 		Serial1.flush();
 		midnight_skip = true;
-#ifdef MY_ROOM
+#ifdef USE_ESP8266
 		now = esp8266.getTimeFromNTPServer();
 		clock.adjust(now);
 #endif

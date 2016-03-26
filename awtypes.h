@@ -96,10 +96,11 @@ typedef struct sensorValues{
 // #define WCF_SET_PROGRAM_ID(x, pid)	{(x).wc.flags = ((x).wc.flags &0x0F) | ((pid)<<4);}
 // #define WCF_GET_AIRTIME(x) ( ((x).wc.flags &0x0A)>>2)
 // #define WCF_SET_AIRTIME(x, val) {(x).wc.flags &= 0x0A; (x).wc.flags |= ((uint8_t)val & 0x03) << 2;}
-struct coords{
+typedef struct coords{
 	uint8_t	x:3;
 	uint8_t y:5;
-};
+	uint8_t index;
+}coords;
 
 typedef struct wateringConfig{
 	uint8_t	x:3;

@@ -153,6 +153,9 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
   	servoDown();
   	servoUp();
   	park();
+#ifdef MY_ROOM
+	moveToPos(0,0);
+#endif
 	/*
 Y fwd: 8 pos at 35135
 
@@ -524,12 +527,12 @@ bool WaterDoserSystem::park()
 #ifdef MY_ROOM
 		if (LOW == digitalRead(X_BEGIN_PIN))
 #else
-		Serial1.print("X bsw");
+// 		Serial1.print("X bsw");
 		Serial1.println(analogRead(X_BEGIN_PIN - A0), DEC);
 		if (analogRead(X_BEGIN_PIN - A0) > (X_BEGIN_STOPVAL+20))
 #endif
 		{
-			Serial1.println(F("stopX"));
+// 			Serial1.println(F("stopX"));
  			stopX();
 			bits &= 0xFE;
 		}
@@ -550,8 +553,8 @@ bool WaterDoserSystem::park()
 	delay(1000);
 	bwdX();
 	bwdY();
-	Serial1.println(F("move X bwd"));
-	Serial1.println(F("move Y bwd"));
+// 	Serial1.println(F("move X bwd"));
+// 	Serial1.println(F("move Y bwd"));
 
 	bits = 0x03;
 	while (bits) {
@@ -652,7 +655,17 @@ bool WaterDoserSystem::parkY()
 
 bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 {
-	if (x > WD_SIZE_X || y > WD_SIZE_Y) {
+	if (x >= WD_SIZE_X) {
+		Serial1.print(F("out of X size "));
+		Serial1.print(x, DEC);
+		Serial1.print(" / ");
+		Serial1.print(WD_SIZE_X, DEC);
+	}
+	if (y >= WD_SIZE_Y) {
+		Serial1.println(F("out of Y size"));
+		Serial1.print(y, DEC);
+		Serial1.print(" / ");
+		Serial1.print(WD_SIZE_Y, DEC);
 		return false;
 	}
 	servoUp();
@@ -778,7 +791,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (analogRead(X_BEGIN_PIN-A0) <= X_BEGIN_STOPVAL)
 #endif
 			{
-// 				Serial1.println("ERROR: x at start");
+ 				Serial1.println("ERROR: x at start");
 				stopX();
 				stopY();
 				return false;
@@ -949,6 +962,14 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 	servoUp();
 // 	delay(500);
 	return ret_ml;
+}
+
+coords WaterDoserSystem::curPos()
+{
+	coords ret;
+	ret.x = cur_x;
+	ret.y = cur_y;
+	return ret;
 }
 
 WaterDoserSystem water_doser;
