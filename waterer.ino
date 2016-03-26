@@ -530,7 +530,7 @@ typedef struct wateringConfig{
 	return true;
 }
 
-static char cmdbuf[64]={0};
+static char cmdbuf[80]={0};
 
 void checkCommand()
 {
@@ -555,7 +555,7 @@ void checkCommand()
 
 }//sub
 
-#ifdef MY_ROOM
+#ifdef USE_ESP8266
 void processPacket(char*cmd)
 {
 	Serial1.print(F("get cmd from esp ["));
@@ -598,7 +598,7 @@ void setup()
 {
 	Serial1.begin(BT_BAUD);
  	Serial1.println(F("HELLO;"));
-#ifdef MY_ROOM
+#ifdef USE_ESP8266
  	esp8266.begin(38400, ESP_RST_PIN);
  	esp8266.setPacketParser(processPacket);
  	esp8266.connect();
@@ -642,7 +642,7 @@ void loop()
 {
 	PORTE = PINE ^ (1<<2);
    	checkCommand();
-#ifdef MY_ROOM	
+#ifdef USE_ESP8266	
 	esp8266.process();
 #endif
 //  	return;

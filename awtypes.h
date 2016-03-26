@@ -256,6 +256,8 @@ template<typename field_type> void print_field(HardwareSerial* output, field_typ
 {
 	output->print(field);
 	output->print(terminator);
+// 	Serial1.print(field);
+// 	Serial1.print(terminator);
 }
 
 template<typename field_type> bool set_field(field_type& field, char**ptr)

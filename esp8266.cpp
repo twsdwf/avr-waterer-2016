@@ -27,7 +27,7 @@ void ESP8266::begin(uint32_t baud,uint8_t _rst)
 
 bool ESP8266::sendCmd_P(PGM_P cmd, bool wait_reply, PGM_P reply_ok, uint32_t timeout)
 {
-	int16_t bi = 0;
+// 	int16_t bi = 0;
 	while (com->available() > 0 ){
 		esp_buf[ bi ] = com->read();
 		if (esp_buf[bi] >=' ' || esp_buf[bi] == 10) {
@@ -126,14 +126,22 @@ void ESP8266::process()
           state = enReadPacket;
           bi = 0;
           continue;
-        } else if ( state == enReadPacket) {
+        } else if (state == enReadPacket) {
           esp_buf[bi++] = ch;
-// 		  Serial.print("put char [");Serial.print(ch);Serial.println("] to packet");
+		  if (strstr_P(esp_buf, PSTR("CONNECT")) || strstr_P(esp_buf, PSTR("CLOSED"))||strstr_P(esp_buf,PSTR("+IPD"))) {
+			bi = 0;  
+		  }
+		  if (bi >= sizeof(esp_buf)) {
+			Serial1.println(F("esp buf overflow"));
+			bi = 0;
+		  }
+  		  Serial.print("esp_buf [");Serial.print(esp_buf);Serial.println("]");
           if (ch == ';') {
             esp_buf[bi] = 0;
 // 			Serial.println("packet read ok");
             processPacket(esp_buf);
             state = enWaitIPD;
+			bi=0;
           }
         } else {//if states
 			state = enWaitIPD;
@@ -152,7 +160,7 @@ bool ESP8266::sendCmd(char*cmd, bool wait_reply, char*reply_ok, uint32_t timeout
 		}
 	}
 	esp_buf[ bi ] = 0;
-	if (dbg) {
+	if (1||dbg) {
 		Serial1.print(F("send cmd:"));
 		Serial1.println(cmd);
 	}

@@ -344,6 +344,23 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				if (pc.wc.enabled == 0) {
 					continue;
 				}
+			}
+		}
+	}
+	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr) {
+		data = clock.readRAMbyte(addr);
+ 		output->print("read byte ");
+ 		output->print(addr, DEC);
+ 		output->print(" ");
+ 		output->print(data, BIN);
+		output->println(';');
+		int j = 0;
+		for (j = 0; j < 8; ++j) {
+			if (data & (1<<j)) {
+				potConfig pc = g_cfg.readPot( i * 8 + j);
+				if (pc.wc.enabled == 0) {
+					continue;
+				}
  				output->print("watering to ");
 				output->print(pc.name);
 				output->print(' ');

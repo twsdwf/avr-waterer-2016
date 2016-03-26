@@ -49,6 +49,7 @@
 #else
 	#define Y_BEGIN_PIN			(A7)
 	#define Y_BEGIN_STOPVAL 	400
+	#define BIGROOM_STOPVAL		400
 #endif
 
 
@@ -149,9 +150,9 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 
-	servoDown();
-	servoUp();
- 	park();
+  	servoDown();
+  	servoUp();
+  	park();
 	/*
 Y fwd: 8 pos at 35135
 
@@ -242,17 +243,18 @@ void WaterDoserSystem::servoUp()
  #ifdef MY_ROOM
 	while (analogRead(6) < 200 && (millis() - start < 10000UL))
  #else
-	while (analogRead(6) > 300 && (millis() - start < 10000UL))
+// 	Serial1.println(analogRead(6), DEC);
+	while (analogRead(6) < 600 && (millis() - start < 10000UL))
  #endif
 	{
 		pinMode(VCC_PUMP_EN, OUTPUT);
 		digitalWrite(VCC_PUMP_EN, HIGH);
- 		Serial1.println(analogRead(6), DEC);
+//   		Serial1.println(analogRead(6), DEC);
 	}
  #ifdef MY_ROOM
 	if (analogRead(6) < 200)
  #else
-	if (analogRead(6) > 300)
+	if (analogRead(6) < 600)
  #endif
 	{
 		errcode = WDERR_STICKED;
@@ -278,8 +280,9 @@ bool WaterDoserSystem::servoDown()
  #ifdef MY_ROOM
 	while (analogRead(6) > 100 && millis() - start < 1000);
 #else
-	while (analogRead(6) < 500 && millis() - start < 1000) {
-		Serial1.println(analogRead(6), DEC);
+// 	Serial1.println(analogRead(6), DEC);
+	while (analogRead(6) > BIGROOM_STOPVAL && millis() - start < 1000) {
+  		Serial1.println(analogRead(6), DEC);
 	}
 #endif
 // 	return false;
@@ -288,8 +291,9 @@ bool WaterDoserSystem::servoDown()
 #ifdef MY_ROOM
 	while (analogRead(6) > 100) {
 #else
-	while (analogRead(6) < 500) {
+	while (analogRead(6) > BIGROOM_STOPVAL) {
 #endif
+		Serial1.println(analogRead(6), DEC);
 		pinMode(VCC_PUMP_EN, OUTPUT);
 		digitalWrite(VCC_PUMP_EN, HIGH);
 
@@ -482,17 +486,17 @@ void WaterDoserSystem::haltPumps()
 
 void WaterDoserSystem::testES()
 {
-/*	
-	Serial1.print("X begin=");
-#ifdef MY_ROOM
-	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
-#else
-	Serial1.println(analogRead(X_BEGIN_PIN), DEC);
-#endif
-	Serial1.print("X end=");
-	Serial1.println(analogRead(X_END_PIN), DEC);
-	Serial1.print("X stepper=");
-	Serial1.println(digitalRead(X_STEP_PIN), DEC);
+	return;
+// 	Serial1.print("X begin=");
+// #ifdef MY_ROOM
+// 	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
+// #else
+// 	Serial1.println(analogRead(X_BEGIN_PIN), DEC);
+// #endif
+// 	Serial1.print("X end=");
+// 	Serial1.println(analogRead(X_END_PIN), DEC);
+// 	Serial1.print("X stepper=");
+// 	Serial1.println(digitalRead(X_STEP_PIN), DEC);
 
 	Serial1.print("Y begin=");
 #ifdef MY_ROOM
@@ -507,7 +511,7 @@ void WaterDoserSystem::testES()
 
 	Serial1.print("Z begin=");
 	Serial1.println(analogRead(6), DEC);
-	*/
+
 
 }
 bool WaterDoserSystem::park()
@@ -520,24 +524,35 @@ bool WaterDoserSystem::park()
 #ifdef MY_ROOM
 		if (LOW == digitalRead(X_BEGIN_PIN))
 #else
-		if (analogRead(X_BEGIN_PIN - A0) > (X_BEGIN_STOPVAL*1.1))
+		Serial1.print("X bsw");
+		Serial1.println(analogRead(X_BEGIN_PIN - A0), DEC);
+		if (analogRead(X_BEGIN_PIN - A0) > (X_BEGIN_STOPVAL+20))
 #endif
 		{
-// 			stopX();
+			Serial1.println(F("stopX"));
+ 			stopX();
 			bits &= 0xFE;
 		}
 #ifdef MY_ROOM
 		if (HIGH == digitalRead(Y_BEGIN_PIN))
 #else
-		if (analogRead(Y_BEGIN_PIN - A0) > (Y_BEGIN_STOPVAL*1.1))
+// 		Serial1.print("Y bsw");
+// 		Serial1.println(analogRead(Y_BEGIN_PIN - A0), DEC);
+
+		if (analogRead(Y_BEGIN_PIN - A0) > 500)
 #endif
 		{
+			stopY();
+// 			Serial1.println(F("stop Y"));
 			bits &= 0xFD;
 		}
 	}//while bits
 	delay(1000);
 	bwdX();
 	bwdY();
+	Serial1.println(F("move X bwd"));
+	Serial1.println(F("move Y bwd"));
+
 	bits = 0x03;
 	while (bits) {
 #ifdef MY_ROOM
@@ -552,7 +567,7 @@ bool WaterDoserSystem::park()
 #ifdef MY_ROOM
 		if (LOW == digitalRead(Y_BEGIN_PIN))
 #else
-		if (analogRead(Y_BEGIN_PIN - A0) <= Y_BEGIN_STOPVAL)
+		if (analogRead(Y_BEGIN_PIN - A0) < 500)
 #endif
 		{
 			stopY();
@@ -787,7 +802,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 #ifdef MY_ROOM
 			if (HIGH == digitalRead(Y_BEGIN_PIN))
 #else
-			if (analogRead(Y_BEGIN_PIN-A0) <= Y_BEGIN_STOPVAL)
+			if (analogRead(Y_BEGIN_PIN-A0) > 500)
 #endif
 			{
 // 				Serial1.println("y parked. move fwd");
@@ -839,7 +854,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 #ifdef MY_ROOM
 			if (digitalRead(Y_BEGIN_PIN) == LOW) 
 #else
-			if (analogRead(Y_BEGIN_PIN-A0)<= Y_BEGIN_STOPVAL)
+			if (analogRead(Y_BEGIN_PIN-A0) < 500)
 #endif
 			{
 				Serial1.println(F("ERROR: y at start"));
