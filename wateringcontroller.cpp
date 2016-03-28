@@ -337,7 +337,7 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 	uint8_t i = 0, ip = 0;
 	
 	coords pts[32];
-	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr) {
+	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr, ++i) {
 		data = clock.readRAMbyte(addr);
 		int j = 0;
 		for (j = 0; j < 8; ++j) {
@@ -351,13 +351,17 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				pts[ip].index = i * 8 + j;
 				Serial1.print("[");
 				Serial1.print(pts[ip].index, DEC);
+				Serial1.print(":");
+				Serial1.print(pts[ip].x, DEC);
+				Serial1.print(",");
+				Serial1.print(pts[ip].y, DEC);
 				Serial1.println("]");
 				++ip;
 			}
 		}
 	}
-// 	Serial1.print(F("pots to water:"));
-// 	Serial1.println(ip, DEC);
+ 	Serial1.print(F("pots to water:"));
+ 	Serial1.println(ip, DEC);
 	
 	if (ip <= 0) {
 		return;
@@ -366,7 +370,13 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 	coords cur = water_doser.curPos();
 	int cd = 1000,ci=-1;
 // 	uint32_t start = millis();
-
+			Serial1.print(F("cur ("));
+			Serial1.print(cur.index, DEC);
+			Serial1.print(F(","));
+			Serial1.print(cur.x, DEC);
+			Serial1.print(F(","));
+			Serial1.print(cur.y, DEC);
+			Serial1.print(F(")"));
 	do {
 		cd = 1000;
 		ci = -1;
@@ -392,11 +402,12 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
  		Serial1.println(ci, DEC);
 		if ( ci > -1) {
 			Serial1.print(" (");
+			Serial1.print(pts[ci].index);
+			Serial1.print(":");
 			Serial1.print(pts[ci].x);
 			Serial1.print(",");
 			Serial1.print(pts[ci].y);
 			Serial1.print(") ");
-			Serial1.print(pts[ci].index);
 			potConfig pc = g_cfg.readPot(pts[ci].index);
 			
 			if (pc.wc.enabled) {
@@ -412,17 +423,67 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 					uint16_t ml = water_doser.pipi(pts[ci].x, pts[ci].y, pc.wc.ml);
 					incDayML(pts[ci].index, ml);
 				} else {
-					water_doser.moveToPos(pts[ci].x, pts[ci].y);
-					water_doser.servoDown();
-					water_doser.servoUp();
+ 					water_doser.moveToPos(pts[ci].x, pts[ci].y);
+ 					water_doser.servoDown();
+ 					water_doser.servoUp();
 				}
 			}
-			data = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (ci/8));
-			data &= ~(1<<(ci % 8));
-			clock.writeRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (ci/8), data);
+// 			data = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (pts[ci].index/8));
+// 			data &= ~(1<<(pts[ci].index % 8));
+// 			clock.writeRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (pts[ci].index/8), data);
+			Serial1.print("points {");
+			for (uint8_t p = 0;p < ip;++p) {
+				Serial1.print(" (");
+				Serial1.print(pts[p].index);
+				Serial1.print(":");
+				Serial1.print(pts[p].x);
+				Serial1.print(",");
+				Serial1.print(pts[p].y);
+				Serial1.print(") ");
+			}
+			Serial1.println("}");
 			cur = pts[ ci ];
-			pts[ ci ] = pts[ip - 1];
+			Serial1.print("new cur (");
+			Serial1.print(cur.index);
+			Serial1.print(":");
+			Serial1.print(cur.x);
+			Serial1.print(",");
+			Serial1.print(cur.y);
+			Serial1.println(") ");
+			Serial1.print(F("ip="));
+			Serial1.println(ip, DEC);
+			if (ip > 1) {
+				Serial1.print("move pt (");
+				Serial1.print(pts[ip-1].index);
+				Serial1.print(":");
+				Serial1.print(pts[ip-1].x);
+				Serial1.print(",");
+				Serial1.print(pts[ip-1].y);
+				Serial1.print(") ");
+				pts[ ci ].x = pts[ip - 1].x;
+				pts[ ci ].y = pts[ip - 1].y;
+				pts[ ci ].index = pts[ip - 1].index;
+				Serial1.print("new ci pt (");
+				Serial1.print(pts[ci].index);
+				Serial1.print(":");
+				Serial1.print(pts[ci].x);
+				Serial1.print(",");
+				Serial1.print(pts[ci].y);
+				Serial1.print(")\r\n{");
+			} else {
+				Serial1.println(F("    ip=1"));
+			}
 			--ip;
+			for (uint8_t p=0;p<ip;++p) {
+				Serial1.print(" (");
+				Serial1.print(pts[p].index);
+				Serial1.print(":");
+				Serial1.print(pts[p].x);
+				Serial1.print(",");
+				Serial1.print(pts[p].y);
+				Serial1.print(") ");
+			}
+			Serial1.println("}");
 		} else {
 // 			Serial1.println(F("next pos not found"));
 // 			Serial1.println(ip, DEC);

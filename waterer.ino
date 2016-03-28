@@ -18,7 +18,6 @@
 #include <math.h>
 #include <PCF8574.h>
 #ifdef MY_ROOM
-	#define PLANT_LIGHT_PIN 12
 	#include <BH1750.h>
 #endif
 

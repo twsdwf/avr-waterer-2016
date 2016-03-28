@@ -5,7 +5,6 @@
 #include "config_defines.h"
 #include "configuration.h"
 
-#define AIN_PIN			1 //analog
 #define PCF_PIN_A		7
 #define PCF_PIN_B		3
 #define PCF_PIN_C		1

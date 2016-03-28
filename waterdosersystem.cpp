@@ -14,52 +14,8 @@
 #define WFSM_WATERCOUNTER 	(1)
 #define WFSM_MOVE			(2)
 
-#define STEPS				(12)
-
-#define AIR_PIN				(22)
-#define PUMP_PIN			(21)
-#define WFS_PIN				(20)
-
-#define X_AXE_DIR			26
-#define X_AXE_DIR2			27
-
-#define Y_AXE_DIR			28
-#define Y_AXE_DIR2			29
-
-#define X_AXE_EN			40
-#define Y_AXE_EN			39
-
-#define VCC_PUMP_EN			34
-
-#ifdef MY_ROOM
-	#define X_BEGIN_PIN			23 // wrong: analog! PF6/D49
-	#define MIN_MOVE_TIME_BTW	1000
-	#define MIN_MOVE_LOW_TIME		200
-#else
-	#define X_BEGIN_PIN			(A4)
-	#define X_BEGIN_STOPVAL		200
-	#define MIN_MOVE_TIME_BTW	2000
-	#define MIN_MOVE_LOW_TIME		500
-#endif
-
-#define X_END_PIN			7 //analog! PF7/D50
-
-#ifdef MY_ROOM
-	#define Y_BEGIN_PIN			52 // digital!
-#else
-	#define Y_BEGIN_PIN			(A7)
-	#define Y_BEGIN_STOPVAL 	400
-	#define BIGROOM_STOPVAL		400
-#endif
 
 
-#define Y_END_PIN			5 // analog! PF5/D48
-
-#define X_STEP_PIN			(31)
-#define Y_STEP_PIN			(30)
-
-#define Z_AXE_EN			(36)
-#define Z_AXE_DIR			(35)
 
 #define WDERR_STICKED		1
 #define WDERR_WFS_DEAD		2
@@ -143,19 +99,21 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	digitalWrite(Y_AXE_DIR2, LOW);
 	digitalWrite(Y_AXE_EN, LOW);
 #ifndef MY_ROOM
- 	Serial1.println(analogRead(6), DEC);
+//  	Serial1.println(analogRead(6), DEC);
 #endif
 	cur_x = 0xFF;
 	cur_y = 0xFF;
 	pinMode(Z_AXE_DIR, OUTPUT);
 	pinMode(Z_AXE_EN, OUTPUT);
 
+// #ifdef MY_ROOM
   	servoDown();
   	servoUp();
   	park();
-#ifdef MY_ROOM
 	moveToPos(0,0);
-#endif
+// #else
+// 	park();
+// #endif
 	/*
 Y fwd: 8 pos at 35135
 
@@ -528,8 +486,8 @@ bool WaterDoserSystem::park()
 		if (LOW == digitalRead(X_BEGIN_PIN))
 #else
 // 		Serial1.print("X bsw");
-		Serial1.println(analogRead(X_BEGIN_PIN - A0), DEC);
-		if (analogRead(X_BEGIN_PIN - A0) > (X_BEGIN_STOPVAL+20))
+// 		Serial1.println(analogRead(X_BEGIN_PIN - A0), DEC);
+		if (analogRead(X_BEGIN_PIN - A0) < 300)
 #endif
 		{
 // 			Serial1.println(F("stopX"));
@@ -553,15 +511,15 @@ bool WaterDoserSystem::park()
 	delay(1000);
 	bwdX();
 	bwdY();
-// 	Serial1.println(F("move X bwd"));
-// 	Serial1.println(F("move Y bwd"));
+ 	Serial1.println(F("move X bwd"));
+ 	Serial1.println(F("move Y bwd"));
 
 	bits = 0x03;
 	while (bits) {
 #ifdef MY_ROOM
 		if (HIGH == digitalRead(X_BEGIN_PIN))
 #else
-		if (analogRead(X_BEGIN_PIN - A0) <= X_BEGIN_STOPVAL)
+		if (analogRead(X_BEGIN_PIN - A0) > 500)
 #endif
 		{
 			stopX();
@@ -606,12 +564,12 @@ bool WaterDoserSystem::parkX()
 		bwdX();
 	}
 #else
-	while(analogRead(X_BEGIN_PIN - A0) >= X_BEGIN_STOPVAL) {
+	while(analogRead(X_BEGIN_PIN - A0) > 300) {
 		Serial1.print(F("bwdX es:"));
 		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		bwdX();
 	}
-	while(analogRead(X_BEGIN_PIN - A0) <= X_BEGIN_STOPVAL) {
+	while(analogRead(X_BEGIN_PIN - A0) < 500 ) {
 		Serial1.print(F("fwd2 X es:"));
 		Serial1.println(analogRead(X_BEGIN_PIN -A0), DEC);
 		fwdX();
@@ -736,7 +694,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 #ifdef MY_ROOM
 			if (HIGH == digitalRead(X_BEGIN_PIN))
 #else
-			if(analogRead(X_BEGIN_PIN - A0)>= X_BEGIN_STOPVAL)
+			if(analogRead(X_BEGIN_PIN - A0)>= 500)
 #endif
 			{
 // 				Serial1.println("x parked. move fwd");
@@ -788,7 +746,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 #ifdef MY_ROOM
 			if (digitalRead(X_BEGIN_PIN) == HIGH)
 #else
-			if (analogRead(X_BEGIN_PIN-A0) <= X_BEGIN_STOPVAL)
+			if (analogRead(X_BEGIN_PIN-A0) > 500)
 #endif
 			{
  				Serial1.println("ERROR: x at start");
@@ -946,6 +904,7 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 		return 0;
 	}
 	if (errcode > 0) {
+		servoUp();
 		Serial1.print(F("STOP due fatal error "));
 		Serial1.print(errcode, DEC);
 		Serial1.println(F(";"));
@@ -953,7 +912,7 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 	}
 // 	Serial1.println(F("pipi"));
 	pinMode(AIR_PIN, OUTPUT);
-// 	digitalWrite(AIR_PIN, HIGH);
+ 	digitalWrite(AIR_PIN, HIGH);
 // 	this->init_measure();
 	uint16_t ret_ml = this->measure(ml, 5000);
 	Serial1.print(ret_ml, DEC);
