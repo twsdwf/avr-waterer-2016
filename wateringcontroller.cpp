@@ -30,10 +30,20 @@ uint16_t WateringController::readDayML(uint8_t index)
 	return EEPROM.read(index * 2) | (EEPROM.read(index*2+1)<<8);
 }
 
+uint8_t WateringController::getStatDay()
+{
+	return EEPROM.read(EEPROM_DAYINDEX_ADDR);
+}
+
+void WateringController::setStatDay(uint8_t day)
+{
+	EEPROM.write(EEPROM_DAYINDEX_ADDR, day);
+}
+
 void WateringController::writeDayML(uint8_t index, uint16_t val)
 {
-	EEPROM.write(index*2, val &0xFF);
-	EEPROM.write(index*2+1, val>>8);
+	EEPROM.write(index * 2, val & 0xFF);
+	EEPROM.write(index * 2 + 1, val>>8);
 }
 void WateringController::incDayML(uint8_t index, uint16_t inc)
 {
@@ -72,8 +82,8 @@ void WateringController::init(I2CExpander* _exp)
 				}
 			}
 		}
-//   		Serial1.print(F("devices:"));
-//   		Serial1.println(sv_count, DEC);
+   		Serial1.print(F("devices:"));
+   		Serial1.println(sv_count, DEC);
 		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
 		if (_sensor_values == 0) {
 			Serial1.println(F("FATAL ERROR: malloc() failed;"));
@@ -102,17 +112,17 @@ void WateringController::init(I2CExpander* _exp)
 void WateringController::dumpSensorValues(HardwareSerial*output)
 {
 	i2cexp->i2c_on();
-// 	Serial1.print(" addr=");
-// 	Serial1.print((int)_sensor_values, DEC);
+	Serial1.print(" addr=");
+	Serial1.print((int)_sensor_values, DEC);
 
 	for (uint8_t i = 0; i < sv_count; ++i) {
-// 		Serial1.print("addr:");
-// 		Serial1.println(_sensor_values[i].address, DEC);
+		Serial1.print("addr:");
+		Serial1.println(_sensor_values[i].address, DEC);
 
 		if (!i2cexp->readSensorValues( &_sensor_values[i]) ) {
-// 			Serial1.print(F("ERROR while read sensors at address "));
-// 			Serial1.print((_sensor_values+i)->address, DEC);
-// 			Serial1.println(';');
+			Serial1.print(F("ERROR while read sensors at address "));
+			Serial1.print((_sensor_values+i)->address, DEC);
+			Serial1.println(';');
 		}
 	}
 	i2cexp->i2c_off();
@@ -141,12 +151,12 @@ int WateringController::run_checks(HardwareSerial* output)
  	}//for i
 
 	i2cexp->i2c_on();
-// 	Serial1.print(" addr=");
-// 	Serial1.print((int)_sensor_values, DEC);
+	Serial1.print(" addr=");
+	Serial1.print((int)_sensor_values, DEC);
 	
 	for (uint8_t i = 0; i < sv_count; ++i) {
-// 		Serial1.print("addr:");
-// 		Serial1.println(_sensor_values[i].address, DEC);
+		Serial1.print("addr:");
+		Serial1.println(_sensor_values[i].address, DEC);
 		
 		if (!i2cexp->readSensorValues( &_sensor_values[i]) ) {
 			output->print(F("ERROR while read sensors at address "));
@@ -211,11 +221,11 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result, Hardw
 
 	int16_t cur_value = -1;
 	for (uint8_t i = 0; i < sv_count; ++i) {
-// 		Serial1.print(i);
-// 		Serial1.print(' ');
-// 		Serial1.print(sv[i].address, DEC);
-// 		Serial1.print('/');
-// 		Serial1.println(pot.sensor.dev, DEC);
+		Serial1.print(i);
+		Serial1.print(' ');
+		Serial1.print(_sensor_values[i].address, DEC);
+		Serial1.print('/');
+		Serial1.println(pot.sensor.dev, DEC);
 		if ( _sensor_values[i].address == pot.sensor.dev) {
 			cur_value = _sensor_values[i].pin_values[ pot.sensor.pin ];
 			break;
@@ -421,11 +431,15 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				output->println(';');
 				if (real) {
 					uint16_t ml = water_doser.pipi(pts[ci].x, pts[ci].y, pc.wc.ml);
+					Serial1.println(F("pipi is OK, saving"));
 					incDayML(pts[ci].index, ml);
 				} else {
- 					water_doser.moveToPos(pts[ci].x, pts[ci].y);
- 					water_doser.servoDown();
- 					water_doser.servoUp();
+ 					if(water_doser.moveToPos(pts[ci].x, pts[ci].y)) {
+						water_doser.servoDown();
+						water_doser.servoUp();
+					} else {
+						Serial1.println(F("ERROR: move fault"));
+					}
 				}
 			}
 // 			data = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (pts[ci].index/8));
@@ -485,8 +499,8 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 			}
 			Serial1.println("}");
 		} else {
-// 			Serial1.println(F("next pos not found"));
-// 			Serial1.println(ip, DEC);
+			Serial1.println(F("next pos not found"));
+			Serial1.println(ip, DEC);
 			break;
 		}
 	}  while (ip > 0);

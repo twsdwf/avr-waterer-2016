@@ -30,6 +30,7 @@ PAGE		content
 #define GCFG_ADDRESS		32
 
 #define MAX_POTS			80
+#define EEPROM_DAYINDEX_ADDR ((MAX_POTS) * 2 + 1)
 // #define EXPANDERS_START_PAGE		2
 #ifdef MY_ROOM
 	#define	WD_SIZE_X	3
@@ -42,7 +43,7 @@ PAGE		content
 	#define MIN_MOVE_TIME_BTW	2000
 	#define MIN_MOVE_LOW_TIME		500
 	#define Y_BEGIN_STOPVAL 	400
-	#define BIGROOM_STOPVAL		400
+	#define BIGROOM_STOPVAL		1001
 #endif
 
 

@@ -9,7 +9,10 @@
 #define PCF_PIN_B		3
 #define PCF_PIN_C		1
 #define PCF_PIN_D		0
-#define PCF_PIN_INH		2	//should be default HIGH 
+#define PCF_PIN_INH		2	//should be default HIGH
+#define PCF_PIN_EN1		5
+#define PCF_PIN_EN2		6
+
 
 
 #include "i2cexpander.h"
@@ -103,16 +106,18 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 		this->write(PCF_PIN_C, pin & 4);
 		this->write(PCF_PIN_D, pin & 8);
 		this->write(PCF_PIN_INH, LOW);
-		
+// 		this->write(PCF_PIN_EN1, HIGH);
+		pinMode(A1, INPUT);
 		for (uint8_t i=0; i < g_cfg.config.sensor_measures; ++i) {
 			if (g_cfg.config.sensor_read_time > 2) {
 				delay(g_cfg.config.sensor_read_time);
 			}
-			n += analogRead(AIN_PIN);
+			n += analogRead(1);
 		}
 		n /= g_cfg.config.sensor_measures;
 		
 		this->write(PCF_PIN_INH, HIGH);
+// 		this->write(PCF_PIN_EN1, LOW);
 	if (should_off) {
 		i2c_off();
 	}
@@ -137,7 +142,7 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 	delay(g_cfg.config.sensor_init_time);
 // 	Serial1.print(F("read dev #"));
 // 	Serial1.println(data->address, DEC);
-	
+	pinMode(A1, INPUT);
 	for (uint8_t pin = 0; pin < 16; ++pin) {
 		this->write8(1<<PCF_PIN_INH);
 		this->write(PCF_PIN_INH, HIGH);
@@ -146,10 +151,11 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 		this->write(PCF_PIN_C, pin & 4);
 		this->write(PCF_PIN_D, pin & 8);
 		this->write(PCF_PIN_INH, LOW);
+// 		this->write(PCF_PIN_EN1, HIGH);
 		data->pin_values[pin] = 0;
 		for(uint8_t i = 0; i < g_cfg.config.sensor_measures; ++i) {
 			delay(g_cfg.config.sensor_read_time);
-			data->pin_values[pin] += analogRead(AIN_PIN);
+			data->pin_values[pin] += analogRead(1);
 		}
 		data->pin_values[pin] /= g_cfg.config.sensor_measures;
 //  		Serial1.print(data->address, DEC);
@@ -158,6 +164,7 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 //  		Serial1.print(F(":"));
 //  		Serial1.println(data->pin_values[pin], DEC);
 		this->write(PCF_PIN_INH, HIGH);
+// 		this->write(PCF_PIN_EN1, LOW);
 	}
 	if (should_off) {
 		i2c_off();

@@ -39,7 +39,7 @@
 #define Y_AXE_EN			39
 #define X_AXE_EN			40
 
-#define AIN_PIN				44 //A1 //analog
+#define AIN_PIN				A1 //A1 //analog
 
 #define Y_END_PIN			48 //A5
 

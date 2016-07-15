@@ -25,6 +25,8 @@ public:
 	void run_watering(bool real, HardwareSerial* output);
 	void cleanDayStat();
 	void printDayStat(HardwareSerial*output);
+	uint8_t getStatDay();
+	void setStatDay(uint8_t day);
 };
 
 

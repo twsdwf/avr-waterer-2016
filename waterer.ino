@@ -50,6 +50,7 @@ extern "C" {
 ***************************************************************************************************/
 
 #ifdef MY_ROOM
+#define USE_ESP8266
 	BH1750 lightMeter;
 #endif
 #ifdef USE_ESP8266
@@ -331,6 +332,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 				++addr;
 			}
 			output->println(F("0;"));
+			i2cExpander.i2c_off();
 		} else if (isdigit(*(cmd+4))) {
 			int dev=-1,pin=-1;
 			char *ptr = cmd + 4;
@@ -342,8 +344,8 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			output->print(F(","));
 			output->print(i2cExpander.read_pin(dev,pin), DEC);
 			output->println(F(";"));
+			i2cExpander.i2c_off();
 		}
-		i2cExpander.i2c_off();
 	} else if (IS_P(cmd, PSTR("ping"), 4)) {
 		output->println(F("pong;"));
 		Serial1.println(F("pong;"));
@@ -433,6 +435,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 				return true;
 			}
          //pot set <index:0>,<dev:1>,<pin:2>,<x:3>,<y:4>,<name:5>,<airTime:6>,<state:7>,<enabled:8>,<ml:9>,<pgm:10>,<param1:11>[,param2][,param3]...,<daymax>;
+         //set pot 0,61,5,1,3,elephantorhiza,2,1,1,60,1,850;
          //pot set 0,34,1,0,0,euc x1,2,0,1,30,1,700,500
 			uint8_t tmp, index;
 			char*ptr=cmd+8;
@@ -647,6 +650,21 @@ void setup()
 	pinMode(AQUARIUM_PIN, OUTPUT);
 #endif
   	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
+	DateTime lct(last_check_time);
+	Serial1.print(lct.hour(), DEC);
+	Serial1.print(":");
+	Serial1.print(lct.minute(), DEC);
+	Serial1.print(":");
+	Serial1.println(lct.second(), DEC);
+	
+	uint8_t dc = wctl.getStatDay();
+	DateTime now = clock.now();
+	if (now.day() != dc) {
+		Serial1.println(F("clean old stat"));
+		wctl.cleanDayStat();
+		wctl.setStatDay(now.day());
+		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
+	}
 }
 
 /**
@@ -673,7 +691,7 @@ void loop()
 		clock.adjust(now);
 		print_now(&Serial1);
 #endif
-// 		Serial1.println(F("bad time read"));
+ 		Serial1.println(F("bad time read"));
 		return;
 	}
 #ifdef MY_ROOM
@@ -690,8 +708,9 @@ void loop()
 			}
 		}
 	} else {
-// 		Serial1.print(F("time now "));
-// 		Serial1.print(now_m, DEC);
+//  		Serial1.print(F("time now "));
+//  		Serial1.print(now_m, DEC);
+		pinMode(AQUARIUM_PIN, OUTPUT);
 		digitalWrite(AQUARIUM_PIN, LOW);
 		pinMode(PLANT_LIGHT_PIN, OUTPUT);
 		digitalWrite(PLANT_LIGHT_PIN, LOW);
@@ -711,7 +730,7 @@ void loop()
    		Serial1.print(" ");
   		Serial1.println(now.secondstime() - last_check_time, DEC);
 */
-		if ((now.secondstime() - last_check_time > 30 * 60) || iForceWatering) {
+		if ((now.secondstime() - last_check_time > g_cfg.config.test_interval) || iForceWatering) {
 
  			wctl.doPotService(1, &Serial1);
 
@@ -730,6 +749,8 @@ void loop()
 // 		Serial1.println("wctl.midnightTasks() ended");
 		Serial1.flush();
 		wctl.cleanDayStat();
+		wctl.setStatDay(now.day());
+
 // 		Serial1.println("g_cfg.midnight_tasks(); ended");
 // 		Serial1.flush();
 		midnight_skip = true;
@@ -774,26 +795,38 @@ cfg set 1,3,500,100,100,900,2100,1000,2100,3,30;
 2	7	34/8
 2	8	34/9
 
-0,34,1,0,0,euc x1,2,0,1,30,1,670,500;
-1,34,0,0,1,baobab,2,0,0,20,2,500,650,300;
-2,34,12,0,2,euc 34/12,2,0,1,20,1,650,30;
-3,35,14,0,3,euc 35/14,2,0,1,30,1,700,500;
-4,34,14,0,4,euc 34/14,2,0,1,10,1,650,100;
-5,34,5,0,5,baobab 34/5,2,0,1,10,1,630,50;
-6,34,4,0,6,mushmula 34/4,2,0,1,10,1,604,50;
-7,35,8,0,7,tolstanka,2,0,1,10,1,400,50;
-8,35,9,0,8,euc"8",2,0,1,30,1,500,600;
-9,34,6,1,0,cereus 34/6,2,0,1,10,2,550,600,60;
-10,34,13,1,1,maklura 34/13,2,0,1,10,1,680,60;
-11,34,15,1,2,euc.kust 34/15,2,0,1,40,1,730,600;
-12,34,3,1,3,euc. 34/3,2,0,1,40,1,500,600;
-13,34,10,1,4,euc 34/10,2,0,1,40,1,600,600;
-14,35,13,1,5,euc in black pot ,2,0,1,30,1,600,600;
-15,35,11,1,6,baobab 1,2,0,1,30,2,500,600,300;
-16,35,15,1,7,aloe,2,0,1,20,2,460,500,80;
-17,35,10,1,8,albicia,2,0,1,30,1,900,200;
-18,34,7,2,0,euc 34/7,2,0,1,50,1,530,500;
-19,34,11,2,1,ladannik,2,0,1,50,1,700,300;
-20,34,8,2,7,maklura 34/8,2,0,1,10,1,650,60;
-21,34,9,2,8,morkovka 34/9,2,0,1,10,1,650,60;
- */
+0,34,1,0,0,euc x1,1,0,1,20,1,890,500;
+1,34,0,0,1,baobab,1,0,0,10,2,0,650,300;
+2,34,12,0,2,euc 34/12,2,0,1,20,1,700,300;
+3,35,14,0,3,euc 35/14,2,0,1,30,1,865,500;
+4,34,14,0,4,euc 34/14,2,0,1,10,1,750,100;
+5,34,5,0,5,baobab 34/5,0,0,1,20,1,750,60;
+6,34,4,0,6,mushmula 34/4,1,0,1,10,1,520,60;
+7,35,8,0,7,tolstanka port,2,0,1,10,2,0,510,50;
+8,35,9,0,8,euc "8",0,0,1,40,1,720,200;
+9,34,6,1,0,cereus 34/6,2,0,1,10,2,500,580,30;
+10,34,13,1,1,maklura 34/13,1,0,1,10,1,630,30;
+11,34,15,1,2,euc.kust 34/15,1,0,1,20,1,920,600;
+12,34,3,1,3,euc. 34/3,2,0,1,20,1,700,600;
+13,34,10,1,4,euc 34/10,2,0,1,20,1,900,600;
+14,35,13,1,5,euc in black pot ,2,0,1,20,1,580,600;
+15,35,11,1,6,baobab 1,2,0,1,20,2,400,470,300;
+16,35,15,1,7,aloe,2,0,1,20,2,490,510,80;
+17,35,10,1,8,albicia,2,0,1,20,1,850,200;
+18,34,7,2,0,euc 34/7,2,0,1,20,1,780,500;
+19,34,11,2,1,ladannik,0,0,1,20,1,650,300;
+20,34,8,2,7,maklura 34/8,0,0,1,10,1,600,30;
+21,34,9,2,8,morkovka 34/9,0,0,1,10,1,630,200;
+
+1,22,500,0,0,800,2100,1000,2100,3,15;
+
+
+0,61,5,1,3,elephantorhiza,2,1,1,20,1,850,80;
+1,61,2,1,4,euc.degl 61/2,2,1,1,30,1,400,420;
+2,61,4,1,5,euc.degl 61/4,2,1,1,30,1,880,120;
+3,61,0,1,6,mango 0,2,1,1,40,1,880,200;
+4,61,7,1,7,mango 7,2,1,1,40,1,500,200;
+5,61,6,1,8,euc 61/6,2,1,1,40,1,700,300;
+6,61,3,2,0,mango 3,2,1,1,40,1,800,300;
+
+*/
