@@ -79,4 +79,13 @@ PAGE		content
 
 #include "messages_en.h"
 #include "pins.h"
+
+#define LED_RED		2
+#define LED_YELLOW	4
+#define LED_BLUE	6
+#define LED_GREEN	0
+
+#define VBTN_WATERTEST	1
+#define VBTN_WEN		3
+
 #endif

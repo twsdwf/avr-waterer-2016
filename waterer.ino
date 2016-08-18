@@ -9,6 +9,7 @@
 
 #define TWI_BUFFER_LENGTH	16
 #define BUFFER_LENGTH		16
+#define LEDS_ADDR			39
 
 #include <Wire.h>
 
@@ -21,6 +22,7 @@
 	#include <BH1750.h>
 #endif
 
+#include <MCP23017.h>
 #include<EEPROM.h>
 
 #include "config_defines.h"
@@ -62,6 +64,10 @@ RTC_DS1307 clock;
 
 AT24Cxxx mem(I2C_MEMORY_ADDRESS);
 
+#ifdef MY_ROOM
+	MCP23017 leds;
+#endif
+	
 extern Configuration g_cfg;
 
 // ShiftOut hc595(PUMP_HC595_LATCH, PUMP_HC595_CLOCK, PUMP_HC595_DATA, 1);
@@ -273,6 +279,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			output->println(pin, DEC);
 			pinMode(pin, OUTPUT);
 			digitalWrite(pin, HIGH);
+			delay(1000);
 		}
 	} else if(IS_P(cmd, PSTR("-"), 1)) {
 		int pin = atoi(cmd+1);
@@ -620,6 +627,33 @@ void setup()
 {
 	Serial1.begin(BT_BAUD);
  	Serial1.println(F("HELLO;"));
+	Wire.begin();
+ 	clock.begin();
+#ifdef MY_ROOM
+	leds.begin(LEDS_ADDR);
+	for (uint8_t i = 0; i < 16; ++i) {
+		leds.pinMode(i, OUTPUT);
+		leds.digitalWrite(i, LOW);
+	}
+	leds.pinMode(VBTN_WATERTEST, INPUT);
+	leds.pullUp(VBTN_WATERTEST, true);
+	leds.pinMode(VBTN_WEN, INPUT);
+	leds.pullUp(VBTN_WEN, true);
+	
+	leds.digitalWrite(LED_RED, HIGH);
+	leds.digitalWrite(LED_GREEN, HIGH);
+	leds.digitalWrite(LED_BLUE, HIGH);
+	leds.digitalWrite(LED_YELLOW, HIGH);
+	delay(400);
+	leds.digitalWrite(LED_RED, LOW);
+	delay(400);
+	leds.digitalWrite(LED_GREEN, LOW);
+	delay(400);
+	leds.digitalWrite(LED_BLUE, LOW);
+	delay(400);
+	leds.digitalWrite(LED_YELLOW, LOW);	
+#endif
+// return;
 #ifdef USE_ESP8266
  	esp8266.begin(38400, ESP_RST_PIN);
  	esp8266.setPacketParser(processPacket);
@@ -627,6 +661,8 @@ void setup()
 #endif
 	Wire.begin();
  	clock.begin();
+
+	//leds.writeGPIOAB(0xFFFF);
 // 	Serial1.println(freeRam(), DEC);
 #ifdef MY_ROOM
  	lightMeter.begin();
@@ -636,27 +672,26 @@ void setup()
 
    	g_cfg.begin();
  	g_cfg.readGlobalConfig();
-// return;
-// 	g_cfg.config.enabled = 0;
-  	wctl.init(&i2cExpander);
+	wctl.init(&i2cExpander);
 
  	water_doser.begin();
  	Serial1.print(getMemoryUsed(), DEC);
  	Serial1.print(F("/"));
  	Serial1.println(getFreeMemory(), DEC);
-	Serial1.println(F("setup() end"));
 // 	Serial1.println(freeRam(), DEC);
 #ifdef MY_ROOM
 	pinMode(AQUARIUM_PIN, OUTPUT);
+	digitalWrite(AQUARIUM_PIN, HIGH);
 #endif
   	last_check_time = ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_1) << 24) | ((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_2) << 16) |((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3) << 8) | (uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4);
 	DateTime lct(last_check_time);
+	Serial1.print(F("last check time: "));
 	Serial1.print(lct.hour(), DEC);
 	Serial1.print(":");
 	Serial1.print(lct.minute(), DEC);
 	Serial1.print(":");
 	Serial1.println(lct.second(), DEC);
-	
+// 	leds.writeGPIOAB(0xFFFF);
 	uint8_t dc = wctl.getStatDay();
 	DateTime now = clock.now();
 	if (now.day() != dc) {
@@ -665,6 +700,7 @@ void setup()
 		wctl.setStatDay(now.day());
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 	}
+	Serial1.println(F("setup() end"));
 }
 
 /**
@@ -675,10 +711,39 @@ bool midnight_skip = false;
 #ifdef MY_ROOM
 uint32_t last_light_en = 0;
 #endif
+uint8_t _pulse_state = 1;
+
+bool checkContinue()
+{
+	if (leds.digitalRead(VBTN_WEN) == LOW) {
+		Serial1.println("TRIG EN");
+		g_cfg.config.enabled = 1 - g_cfg.config.enabled;
+		g_cfg.writeGlobalConfig();
+	}
+	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
+	return g_cfg.config.enabled;
+}
+
 void loop()
 {
-	PORTE = PINE ^ (1<<2);
+	if (leds.digitalRead(VBTN_WATERTEST) == LOW) {
+		pinMode(PUMP_PIN, OUTPUT);
+		digitalWrite(PUMP_PIN, HIGH);
+		pinMode(VCC_PUMP_EN, OUTPUT);
+		digitalWrite(VCC_PUMP_EN, HIGH);
+		delay(5000);
+		digitalWrite(PUMP_PIN, LOW);
+		digitalWrite(VCC_PUMP_EN, LOW);
+		leds.digitalWrite(LED_BLUE, LOW);
+	}
+	
+	
+#ifdef MY_ROOM
+	_pulse_state = 1 - _pulse_state;
+// 	leds.digitalWrite(0, _pulse_state);
+#endif
    	checkCommand();
+	delay(500);
 #ifdef USE_ESP8266	
 	esp8266.process();
 #endif
@@ -694,8 +759,11 @@ void loop()
  		Serial1.println(F("bad time read"));
 		return;
 	}
+	checkContinue();
 #ifdef MY_ROOM
 	if (now_m > 900 && now_m < 2100) {
+		leds.digitalWrite(LED_GREEN, _pulse_state);
+		pinMode(AQUARIUM_PIN, OUTPUT);
 		digitalWrite(AQUARIUM_PIN, HIGH);
 		if (millis()-last_light_en > 60000UL) {
 			uint16_t lux = lightMeter.readLightLevel();
@@ -714,6 +782,7 @@ void loop()
 		digitalWrite(AQUARIUM_PIN, LOW);
 		pinMode(PLANT_LIGHT_PIN, OUTPUT);
 		digitalWrite(PLANT_LIGHT_PIN, LOW);
+		leds.digitalWrite(LED_YELLOW, LOW);
 	}
 #endif
 	if ( g_cfg.config.enabled
@@ -723,17 +792,21 @@ void loop()
 					(now.dayOfWeek() >= 6 && now_m > g_cfg.config.water_start_time_we && now_m < g_cfg.config.water_end_time_we)
 			) || iForceWatering) {
 		midnight_skip = false;
-  /* 		Serial1.print("times: now: ");
-   		Serial1.print(now.secondstime(), DEC);
-   		Serial1.print(" prev: ");
-   		Serial1.print(last_check_time, DEC);
-   		Serial1.print(" ");
-  		Serial1.println(now.secondstime() - last_check_time, DEC);
-*/
-		if ((now.secondstime() - last_check_time > g_cfg.config.test_interval) || iForceWatering) {
-
+		
+		if ( (now.secondstime() - last_check_time) % 60 == 0) {
+			Serial1.print(F("next check after "));
+			Serial1.print(g_cfg.config.test_interval - (now.secondstime() - last_check_time)/60, DEC);
+			Serial1.println(F(" minutes"));
+		}
+		
+		if ( ((now.secondstime() - last_check_time) / 60 >= g_cfg.config.test_interval) || iForceWatering) {
  			wctl.doPotService(1, &Serial1);
-
+			now = clock.now();
+			last_check_time = now.secondstime();
+			clock.writeRAMbyte(LAST_CHECK_TS_1, last_check_time >> 24);
+			clock.writeRAMbyte(LAST_CHECK_TS_2, last_check_time >> 16);
+			clock.writeRAMbyte(LAST_CHECK_TS_3, last_check_time >> 8);
+			clock.writeRAMbyte(LAST_CHECK_TS_4, last_check_time & 0xFF);
 			iForceWatering = 0;
 		}
 	} else if (now_m < 2 && !midnight_skip) {//midnight

@@ -20,8 +20,12 @@ extern Configuration g_cfg;
 // extern ShiftOut hc595;
 extern WaterDoserSystem water_doser;
 extern I2CExpander i2cExpander;
-extern uint32_t last_check_time;
+// extern uint32_t last_check_time;
+#ifdef MY_ROOM
+	extern MCP23017 leds;
+#endif
 
+	extern bool checkContinue();
 // extern ErrLogger logger;
 
 #define POTS_AT_ONCE	24
@@ -180,29 +184,22 @@ void WateringController::doPotService(bool check_and_watering, HardwareSerial*ou
 	uint8_t state = clock.readRAMbyte(RAM_CUR_STATE);
 	uint8_t sw;
 	DateTime now = clock.now();
-// 	Serial1.print("state=");
-// 	Serial1.print(state, DEC);
-// 	Serial1.println(';');
+ 	Serial1.print("state=");
+ 	Serial1.print(state, DEC);
+ 	Serial1.println(';');
 	
-	if (state == CUR_STATE_IDLE) {
+// 	if (state == CUR_STATE_IDLE) {
 		sw = run_checks(output);
-// 		Serial1.print("sw = ");
-// 		Serial1.print(sw, DEC);
-// 		Serial1.println(';');
-	}
-
-	run_watering(check_and_watering, output);
-	
+ 		Serial1.print("sw = ");
+ 		Serial1.print(sw, DEC);
+ 		Serial1.println(';');
+// 	} else if(state == CUR_STATE_WATER) {
+		run_watering(check_and_watering, output);
+// 	}
 	DateTime now2 = clock.now();
  	output->print(F("watering time: "));
  	output->print(now2.secondstime() - now.secondstime(), DEC);
  	output->println(F("s;"));
-	last_check_time = now2.secondstime();
-	clock.writeRAMbyte(LAST_CHECK_TS_1, last_check_time >> 24);
-	clock.writeRAMbyte(LAST_CHECK_TS_2, last_check_time >> 16);
-	clock.writeRAMbyte(LAST_CHECK_TS_3, last_check_time >> 8);
-	clock.writeRAMbyte(LAST_CHECK_TS_4, last_check_time & 0xFF);
-	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
  	output->println(F("watering end;"));
 }
 
@@ -334,6 +331,9 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result, Hardw
 //
 float distance(const coords& a, const coords& b)
 {
+	if (b.x == -1 || b.y == -1) {
+		return sqrt(a.x * a.x + a.y * a.y);
+	}
 	return sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
 }
 
@@ -431,6 +431,9 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				output->println(';');
 				if (real) {
 					uint16_t ml = water_doser.pipi(pts[ci].x, pts[ci].y, pc.wc.ml);
+					if (ml < 1) {
+						leds.digitalWrite(LED_BLUE, HIGH);
+					}
 					Serial1.println(F("pipi is OK, saving"));
 					incDayML(pts[ci].index, ml);
 				} else {
@@ -441,6 +444,9 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 						Serial1.println(F("ERROR: move fault"));
 					}
 				}
+			}
+			if (!checkContinue()) {
+				return;
 			}
 // 			data = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + (pts[ci].index/8));
 // 			data &= ~(1<<(pts[ci].index % 8));

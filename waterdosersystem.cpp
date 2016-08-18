@@ -42,6 +42,7 @@ extern "C" {
 	#include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
+extern bool checkContinue();
 
 WaterDoserSystem::WaterDoserSystem(){
 	expander_addr = 0;
@@ -59,12 +60,19 @@ void WaterDoserSystem::dope(AirTime at)
 {
 	pinMode(AIR_PIN, OUTPUT);
 	digitalWrite(AIR_PIN, HIGH);
+	uint8_t n = 0;
 	if (at == atShort) {
-		delay(4000);
+		n = 4 * 2;
 	} else if(at == atMedium){
-		delay(8000);
+		n = 8 * 2;
 	}else {
-		delay(12000);
+		n = 6 * 2;
+	}
+	for (uint8_t i = 0; i < n; ++i) {
+		if (!checkContinue()) {
+			break;
+		}
+		delay(500);
 	}
 	digitalWrite(AIR_PIN, LOW);
 }
@@ -218,7 +226,10 @@ void WaterDoserSystem::servoUp()
 	if (analogRead(6) < BIGROOM_STOPVAL)
  #endif
 	{
+		Serial1.println(F("ERROR: sticked!"));
 		errcode = WDERR_STICKED;
+	} else {
+		Serial1.println(F("Z-axe is OK"));
 	}
 
 	digitalWrite(Z_AXE_DIR, LOW);
@@ -421,6 +432,9 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 			start_millis = millis();
 		}
 		prev = state;
+		if (millis() % 500 == 0) {
+			if (!checkContinue()) break;
+		}
 	}//while
 
 	digitalWrite(PUMP_PIN, LOW);
@@ -485,6 +499,14 @@ void WaterDoserSystem::testES()
 bool WaterDoserSystem::park()
 {
 	uint8_t bits = 0x03;
+	
+	errcode = 0;
+	
+	servoUp();
+	
+	if (errcode) {
+		return false;
+	}
 	fwdX();
 	fwdY();
 	delay(3000);
@@ -544,6 +566,8 @@ bool WaterDoserSystem::park()
 		}
 	}
  	testES();
+	cur_x = 0xFF;
+	cur_y = 0xFF;
 	return true;
 }
 
@@ -626,6 +650,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		Serial1.print(x, DEC);
 		Serial1.print(" / ");
 		Serial1.print(WD_SIZE_X, DEC);
+		return false;
 	}
 	if (y >= WD_SIZE_Y) {
 		Serial1.println(F("out of Y size"));
@@ -634,6 +659,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		Serial1.print(WD_SIZE_Y, DEC);
 		return false;
 	}
+	errcode = 0;
 	servoUp();
 	if (errcode) {
 		Serial1.println(F("no move due Z-axe errors"));
@@ -696,8 +722,18 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		fwdY();
 		Serial1.println("should move Y");
 	}
-	uint32_t x_ms=millis(), y_ms=millis();
+	uint32_t x_ms=millis(), y_ms=millis(), full_time = millis();
 	while (xs || ys) {
+		if (!checkContinue()) {
+			stopX();
+			stopY();
+			break;
+		}
+		
+		if (millis() - full_time > 180000UL) {
+			park();
+			return moveToPos(x,y);
+		}
 		if (xs == WDST_PARK) {
 #ifdef MY_ROOM
 			if (HIGH == digitalRead(X_BEGIN_PIN))
@@ -751,6 +787,7 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				}//is xs == 0
 			}//else if cur_x > -1
 		} else if (xs == WDST_WAIT_HI_BWD) {
+// 			Serial1.println(F("xs WDST_WAIT_HI_BWD"));
 #ifdef MY_ROOM
 			if (digitalRead(X_BEGIN_PIN) == HIGH)
 #else
@@ -763,17 +800,26 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				return false;
 			}
 			if (digitalRead(X_STEP_PIN) == HIGH && (millis() - x_ms > MIN_MOVE_TIME_BTW) ) {
+				Serial1.println(F("xs switch to wait low"));
 				x_ms = millis();
 				--cur_x;
 				xs = WDST_WAIT_LO_BWD;
 			}
 		} else if (xs == WDST_WAIT_LO_BWD) {
+// 			Serial1.println(F("xs WDST_WAIT_LO_BWD"));
 			if (digitalRead(X_STEP_PIN) == LOW && (millis() - x_ms > MIN_MOVE_LOW_TIME)) {
 				xs = ( (cur_x == x) ? WDST_STOP : WDST_WAIT_HI_BWD);
+				if(xs == WDST_WAIT_HI_BWD) Serial1.println(F("xs switch to wait high"));
 				x_ms = millis();
 			}
 			if (xs == WDST_STOP) {
+				Serial1.println(F("stopX"));
 				stopX();
+			}
+		} else {
+			if (xs) {
+				Serial1.print(F("unknown state xs="));
+				Serial1.println(xs, DEC);
 			}
 		}
 

@@ -48,6 +48,8 @@
 	#define X_BEGIN_PIN			23
 	#define AQUARIUM_PIN		51
 	#define Y_BEGIN_PIN			52 // digital!
+	#define XY_VCC_AIN			(A0)
+	#define XY_VCC_DELTA		5
 #else
 	#define X_BEGIN_PIN			47// A4
 	#define Y_BEGIN_PIN			(50) //(A7)
