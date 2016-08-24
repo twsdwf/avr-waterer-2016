@@ -272,7 +272,10 @@ bool doCommand(char*cmd, HardwareSerial*output)
 #endif
 	} else if (IS_P(cmd, PSTR("A"), 1)) {
 		output->println(analogRead(cmd[1]-'0'), DEC);
-	} else if (IS_P(cmd, PSTR("+"), 1)) {
+	}/* else if (cmd[0] == 'D') {
+		pinMode(atoi(cmd+1), INPUT);
+		output->println(digitalRead(atoi(cmd + 1)), DEC);
+	} */else if (IS_P(cmd, PSTR("+"), 1)) {
 		int pin = atoi(cmd+1);
 		if(pin > 2) {
 			output->print(F("HIGH pin:"));
@@ -301,7 +304,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		output->println(';');
 	} else if (cmd[0]== 'U') {
 		water_doser.servoUp();
-	}else if (cmd[0]=='D') {
+	} else if (cmd[0]=='D') {
 		water_doser.servoDown();
 	} else if ('G'==cmd[0]) {
 		char *ptr = cmd + 1;
@@ -715,17 +718,20 @@ uint8_t _pulse_state = 1;
 
 bool checkContinue()
 {
+#ifdef MY_ROOM
 	if (leds.digitalRead(VBTN_WEN) == LOW) {
 		Serial1.println("TRIG EN");
 		g_cfg.config.enabled = 1 - g_cfg.config.enabled;
 		g_cfg.writeGlobalConfig();
 	}
 	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
-	return g_cfg.config.enabled;
+#endif
+	return true;//g_cfg.config.enabled;
 }
 
 void loop()
 {
+#ifdef MY_ROOM
 	if (leds.digitalRead(VBTN_WATERTEST) == LOW) {
 		pinMode(PUMP_PIN, OUTPUT);
 		digitalWrite(PUMP_PIN, HIGH);
@@ -736,12 +742,9 @@ void loop()
 		digitalWrite(VCC_PUMP_EN, LOW);
 		leds.digitalWrite(LED_BLUE, LOW);
 	}
-	
-	
-#ifdef MY_ROOM
-	_pulse_state = 1 - _pulse_state;
 // 	leds.digitalWrite(0, _pulse_state);
 #endif
+	_pulse_state = 1 - _pulse_state;
    	checkCommand();
 	delay(500);
 #ifdef USE_ESP8266	

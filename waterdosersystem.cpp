@@ -720,13 +720,15 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 // 		ys = (digitalRead(Y_STEP_PIN)==HIGH ? 3 : 2);
 		ys = (digitalRead(Y_STEP_PIN)==HIGH ? WDST_WAIT_HI_FWD : WDST_WAIT_LO_FWD);
 		fwdY();
-		Serial1.println("should move Y");
+		Serial1.println("should move Y fwd");
 	}
 	uint32_t x_ms=millis(), y_ms=millis(), full_time = millis();
+	Serial1.println(xs ||ys, DEC);
 	while (xs || ys) {
 		if (!checkContinue()) {
 			stopX();
 			stopY();
+			Serial1.println(F("Stop by btn"));
 			break;
 		}
 		

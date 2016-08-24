@@ -432,7 +432,9 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				if (real) {
 					uint16_t ml = water_doser.pipi(pts[ci].x, pts[ci].y, pc.wc.ml);
 					if (ml < 1) {
+#ifdef MY_ROOM
 						leds.digitalWrite(LED_BLUE, HIGH);
+#endif
 					}
 					Serial1.println(F("pipi is OK, saving"));
 					incDayML(pts[ci].index, ml);
