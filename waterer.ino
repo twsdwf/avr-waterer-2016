@@ -272,10 +272,13 @@ bool doCommand(char*cmd, HardwareSerial*output)
 #endif
 	} else if (IS_P(cmd, PSTR("A"), 1)) {
 		output->println(analogRead(cmd[1]-'0'), DEC);
-	}/* else if (cmd[0] == 'D') {
+	} else if (cmd[0] == 'd') {
 		pinMode(atoi(cmd+1), INPUT);
+		delay(20);
+		output->print(atoi(cmd+1), DEC);
+		output->print(":");
 		output->println(digitalRead(atoi(cmd + 1)), DEC);
-	} */else if (IS_P(cmd, PSTR("+"), 1)) {
+	} else if (IS_P(cmd, PSTR("+"), 1)) {
 		int pin = atoi(cmd+1);
 		if(pin > 2) {
 			output->print(F("HIGH pin:"));
@@ -673,11 +676,12 @@ void setup()
 	digitalWrite(PLANT_LIGHT_PIN, LOW);
 #endif
 
-   	g_cfg.begin();
- 	g_cfg.readGlobalConfig();
-	wctl.init(&i2cExpander);
+//    	g_cfg.begin();
+//  	g_cfg.readGlobalConfig();
+// 	wctl.init(&i2cExpander);
 
  	water_doser.begin();
+	return;
  	Serial1.print(getMemoryUsed(), DEC);
  	Serial1.print(F("/"));
  	Serial1.println(getFreeMemory(), DEC);

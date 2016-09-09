@@ -115,9 +115,9 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	pinMode(Z_AXE_EN, OUTPUT);
 
 // #ifdef MY_ROOM
-  	servoDown();
-  	servoUp();
-  	park();
+//   	servoDown();
+//   	servoUp();
+  	parkY();
 // 	moveToPos(0,0);
 // #else
 // 	park();
@@ -840,10 +840,14 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				cur_y = -1;
 			}
 		} else if (ys == WDST_WAIT_LO_FWD/*2*/) {//wait low state.
+			Serial1.print(F("Y L "));
+			Serial1.println(digitalRead(Y_STEP_PIN), DEC);
 			if (digitalRead(Y_STEP_PIN) == LOW) {
 				ys = WDST_WAIT_HI_FWD/*3*/;
 			}
 		} else if (ys == WDST_WAIT_HI_FWD/*3*/) {//wait HIGH
+			Serial1.print(F("Y H "));
+			Serial1.println(digitalRead(Y_STEP_PIN), DEC);
 			if (cur_y == -1) {
 				if (digitalRead(Y_STEP_PIN) && digitalRead(Y_STEP_PIN) ) {
 					++cur_y;
