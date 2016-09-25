@@ -633,8 +633,11 @@ void setup()
 {
 	Serial1.begin(BT_BAUD);
  	Serial1.println(F("HELLO;"));
-	Wire.begin();
- 	clock.begin();
+ 	Wire.begin();
+  	clock.begin();
+ 	water_doser.begin();
+// 	water_doser.testAll();
+// 	return;
 #ifdef MY_ROOM
 	leds.begin(LEDS_ADDR);
 	for (uint8_t i = 0; i < 16; ++i) {
@@ -665,8 +668,8 @@ void setup()
  	esp8266.setPacketParser(processPacket);
  	esp8266.connect();
 #endif
-	Wire.begin();
- 	clock.begin();
+// 	Wire.begin();
+//  	clock.begin();
 
 	//leds.writeGPIOAB(0xFFFF);
 // 	Serial1.println(freeRam(), DEC);
@@ -676,12 +679,11 @@ void setup()
 	digitalWrite(PLANT_LIGHT_PIN, LOW);
 #endif
 
-//    	g_cfg.begin();
-//  	g_cfg.readGlobalConfig();
-// 	wctl.init(&i2cExpander);
+   	g_cfg.begin();
+ 	g_cfg.readGlobalConfig();
+	wctl.init(&i2cExpander);
 
- 	water_doser.begin();
-	return;
+
  	Serial1.print(getMemoryUsed(), DEC);
  	Serial1.print(F("/"));
  	Serial1.println(getFreeMemory(), DEC);
@@ -727,14 +729,18 @@ bool checkContinue()
 		Serial1.println("TRIG EN");
 		g_cfg.config.enabled = 1 - g_cfg.config.enabled;
 		g_cfg.writeGlobalConfig();
+		leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
+		delay(1000);
 	}
 	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
 #endif
 	return true;//g_cfg.config.enabled;
 }
 
+
 void loop()
 {
+// 	return;
 #ifdef MY_ROOM
 	if (leds.digitalRead(VBTN_WATERTEST) == LOW) {
 		pinMode(PUMP_PIN, OUTPUT);
@@ -751,6 +757,7 @@ void loop()
 	_pulse_state = 1 - _pulse_state;
    	checkCommand();
 	delay(500);
+// 	return;
 #ifdef USE_ESP8266	
 	esp8266.process();
 #endif
@@ -785,11 +792,12 @@ void loop()
 	} else {
 //  		Serial1.print(F("time now "));
 //  		Serial1.print(now_m, DEC);
+		leds.digitalWrite(LED_GREEN, LOW);
 		pinMode(AQUARIUM_PIN, OUTPUT);
 		digitalWrite(AQUARIUM_PIN, LOW);
 		pinMode(PLANT_LIGHT_PIN, OUTPUT);
 		digitalWrite(PLANT_LIGHT_PIN, LOW);
-		leds.digitalWrite(LED_YELLOW, LOW);
+		leds.digitalWrite(LED_YELLOW, _pulse_state);
 	}
 #endif
 	if ( g_cfg.config.enabled

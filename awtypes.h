@@ -246,6 +246,7 @@ extern HardwareSerial Serial1;
 // extern Configuration g_cfg;
 
 
+
 inline void get_h_m_from_timefield(uint16_t& time, uint8_t&h, uint8_t&m)
 {
 	h = (time >> 8) & 0xFF;
@@ -305,6 +306,5 @@ typedef struct WaterStorageData{
 	uint8_t pump_pin;
 	char name[17];
 }WaterStorageData;
-
 #endif
 

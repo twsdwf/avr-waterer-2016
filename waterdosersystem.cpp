@@ -21,6 +21,16 @@
 #define WDERR_WFS_DEAD		2
 #define WDERR_POS_ERR		3
 
+#ifdef MY_ROOM
+	#define X_AT_SLOT (digitalRead(X_STEP_PIN) == HIGH)
+	#define Y_AT_SLOT (digitalRead(Y_STEP_PIN) == HIGH)
+#else
+	#define X_AT_SLOT (digitalRead(X_STEP_PIN) == LOW)
+	#define Y_AT_SLOT (digitalRead(Y_STEP_PIN) == LOW)
+#endif
+
+extern void __digitalWrite(uint8_t pin, uint8_t val);
+
 typedef enum WaterDoserSystemState{
 	wdstIdle,
 	wdstWalk,
@@ -106,6 +116,15 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	digitalWrite(Y_AXE_DIR, LOW);
 	digitalWrite(Y_AXE_DIR2, LOW);
 	digitalWrite(Y_AXE_EN, LOW);
+	
+#ifdef BIG_ROOM
+	pinMode(Z_AXE_UP_PIN, INPUT);
+#endif
+// 	while(1){
+// 		testES();
+// 		delay(1000);
+// 	}
+
 #ifndef MY_ROOM
 //  	Serial1.println(analogRead(6), DEC);
 #endif
@@ -115,68 +134,16 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	pinMode(Z_AXE_EN, OUTPUT);
 
 // #ifdef MY_ROOM
-//   	servoDown();
-//   	servoUp();
-  	parkY();
-// 	moveToPos(0,0);
-// #else
-// 	park();
+  	servoDown();
+  	servoUp();
 // #endif
-	/*
-Y fwd: 8 pos at 35135
-
-Y
- bwd: 8 pos at 36493
-
-X fwd: 2 pos at 10629
-
-X bwd: 2 pos at 10434
-
-mixed fwd: (0,0)-(2,2) at 10271
-
-m
-ixed bwd: (2,2)-(0,0) pos at 10271
-	moveToPos(0,0);
-	uint32_t start = millis();
-	moveToPos(0, 8);
-	Serial1.print(F("Y fwd: 8 pos at "));
-	Serial1.println(millis()-start, DEC);
-	start = millis();
-	moveToPos(0,0);
-	Serial1.print(F("Y bwd: 8 pos at "));
-	Serial1.println(millis()-start, DEC);
-	start = millis();
-	moveToPos(2, 0);
-	Serial1.print(F("X fwd: 2 pos at "));
-	Serial1.println(millis()-start, DEC);
-	start = millis();
-	moveToPos(0,0);
-	Serial1.print(F("X bwd: 2 pos at "));
-	Serial1.println(millis()-start, DEC);
-	start = millis();
-	moveToPos(2,2);
-	Serial1.print(F("mixed fwd: (0,0)-(2,2) at "));
-	Serial1.println(millis()-start, DEC);
-	start = millis();
-	moveToPos(0,0);
-	Serial1.print(F("mixed bwd: (2,2)-(0,0) pos at "));
-	Serial1.println(millis()-start, DEC);
-	*/
-// 	while(1){
-// 		testES();
-// 		delay(1500);
-// 	}
-// #ifdef MY_ROOM
-// #else
-//   	parkY();
-//   	parkX();
-// #endif
+	park();
 }
 
 void WaterDoserSystem::testAll()
 {
 	
-	for (uint8_t x = 0; x < WD_SIZE_X; ++x) {
+	/*for (uint8_t x = 0; x < WD_SIZE_X; ++x) {
 		for (uint8_t y = 0; y < WD_SIZE_Y; ++y) {
 			Serial1.print(x, DEC);
 			Serial1.print(F(" "));
@@ -192,15 +159,38 @@ void WaterDoserSystem::testAll()
 			servoDown();
 			delay(500);
 			servoUp();
-// 			delay(500);
 		}
+	}*/
+	uint32_t start = millis();
+	randomSeed(analogRead(0));
+	park();
+	for (uint8_t i=0;i<200;++i) {
+		uint8_t x = random(WD_SIZE_X);
+		uint8_t y = random(WD_SIZE_Y);
+			Serial1.print(i, DEC);
+			Serial1.print(F(": "));
+			Serial1.print(x, DEC);
+			Serial1.print(F(" "));
+			Serial1.print(y, DEC);
+			Serial1.println(F(";"));
+			if(!moveToPos(x,y)) {
+				Serial1.println(F("error in pos"));
+				park();
+				continue;
+			}
+ 			servoDown();
+			delay(500);
+			servoUp();
+// 			delay(3000);
 	}
-	
+	Serial1.print("end in ");
+	Serial1.println(millis()-start);
 }
 
 void WaterDoserSystem::servoUp()
 {
 	errcode = 0;
+// 	return;
 	pinMode(VCC_PUMP_EN, OUTPUT);
 	digitalWrite(VCC_PUMP_EN, HIGH);
 	pinMode(A6, INPUT);
@@ -213,7 +203,7 @@ void WaterDoserSystem::servoUp()
 	while (analogRead(6) < 200 && (millis() - start < 10000UL))
  #else
 // 	Serial1.println(analogRead(6), DEC);
-	while (analogRead(6) < BIGROOM_STOPVAL && (millis() - start < 10000UL))
+	while (digitalRead(Z_AXE_UP_PIN) && (millis() - start < 10000UL))
  #endif
 	{
 		pinMode(VCC_PUMP_EN, OUTPUT);
@@ -223,13 +213,13 @@ void WaterDoserSystem::servoUp()
  #ifdef MY_ROOM
 	if (analogRead(6) < 200)
  #else
-	if (analogRead(6) < BIGROOM_STOPVAL)
+	if (digitalRead(Z_AXE_UP_PIN))
  #endif
 	{
 		Serial1.println(F("ERROR: sticked!"));
 		errcode = WDERR_STICKED;
 	} else {
-		Serial1.println(F("Z-axe is OK"));
+// 		Serial1.println(F("Z-axe is OK"));
 	}
 
 	digitalWrite(Z_AXE_DIR, LOW);
@@ -240,7 +230,7 @@ void WaterDoserSystem::servoUp()
 
 bool WaterDoserSystem::servoDown()
 {
-	pinMode(A6, INPUT);
+	pinMode(Z_AXE_UP_PIN, INPUT);
 	pinMode(VCC_PUMP_EN, OUTPUT);
 	digitalWrite(VCC_PUMP_EN, HIGH);
 	delay(100);
@@ -252,10 +242,10 @@ bool WaterDoserSystem::servoDown()
  #ifdef MY_ROOM
 	while (analogRead(6) > 100 && millis() - start < 1000);
 #else
- 	Serial1.println(analogRead(6), DEC);
-	while (analogRead(6) > BIGROOM_STOPVAL && millis() - start < 1000) {
-   		Serial1.println(analogRead(6), DEC);
-		delay(100);
+//  	Serial1.println(digitalRead(Z_AXE_UP_PIN), DEC);
+	while (!digitalRead(Z_AXE_UP_PIN) && millis() - start < 1000) {
+//    		Serial1.println(digitalRead(Z_AXE_UP_PIN), DEC);
+		delay(300);
 	}
 #endif
 // 	return false;
@@ -265,12 +255,13 @@ bool WaterDoserSystem::servoDown()
 	while (analogRead(6) > 100) {
 #else
 		//BIGROOM_STOPVAL and above -- up pos, less than BIGROOM_STOPVAL -- down pos
-	while (analogRead(6) > BIGROOM_STOPVAL) {
+	while (!digitalRead(Z_AXE_UP_PIN)) {
 #endif
 #ifndef MY_ROOM
-		Serial1.print(analogRead(6), DEC);
-		Serial1.print('/');
-		Serial1.println(BIGROOM_STOPVAL, DEC);
+// 		Serial1.print("reed:");
+// 		Serial1.println(digitalRead(6), DEC);
+// 		Serial1.print('/');
+// 		Serial1.println(BIGROOM_STOPVAL, DEC);
 #endif
 		pinMode(VCC_PUMP_EN, OUTPUT);
 		digitalWrite(VCC_PUMP_EN, HIGH);
@@ -298,72 +289,6 @@ void WaterDoserSystem::servoUnbind()
 
 	digitalWrite(Z_AXE_EN, LOW);
 	digitalWrite(VCC_PUMP_EN, LOW);
-}
-	
-bool WaterDoserSystem::nextX()
-{
-	if (digitalRead(X_STEP_PIN) == HIGH) {
-		while (digitalRead(X_STEP_PIN) == HIGH) {
-			fwdX();
-		}
-	}
-	uint32_t start = millis();
-	if(cur_x == -1) {
-		while (!digitalRead(X_STEP_PIN) && !digitalRead(X_STEP_PIN) ) {
-			fwdX();
-		}
-	} else {
-		while (true) {
-			if (digitalRead(X_STEP_PIN) == HIGH) {
-				if(millis() - start > 1000) break;
-			}
-			fwdX();
-		}
-	}
-	stopX();
-	if (digitalRead(X_STEP_PIN)) {
-		if (cur_x != 0xFF) {
-			++cur_x;
-			return true;
-		} else {
-			cur_x = 0;
-			return true;
-		}
-	}
-	return false;
-}
-
-bool WaterDoserSystem::nextY()
-{
-	if (digitalRead(Y_STEP_PIN) == HIGH) {
-		while (digitalRead(Y_STEP_PIN) == HIGH) {
-			fwdY();
-		}
-	}
-	uint32_t start = millis();
-	if(cur_y == -1) {
-		while (!digitalRead(Y_STEP_PIN) && !digitalRead(Y_STEP_PIN) ) {
-			fwdY();
-		}
-	} else {
-		while (true) {
-			if (digitalRead(Y_STEP_PIN) == HIGH) {
-				if(millis() - start > 1000) break;
-			}
-			fwdY();
-		}
-	}
-	stopY();
-	if (digitalRead(Y_STEP_PIN)) {
-		if (cur_y != 0xFF) {
-			++cur_y;
-			return true;
-		} else {
-			cur_y = 0;
-			return true;
-		}
-	}
-	return false;
 }
 
 void WaterDoserSystem::stopX()
@@ -470,104 +395,97 @@ void WaterDoserSystem::testES()
 {
 // 	return;
 	Serial1.print("X begin=");
-#ifdef MY_ROOM
-	Serial1.println(digitalRead(X_BEGIN_PIN), DEC);
-#else
-	Serial1.println(analogRead(X_BEGIN_PIN), DEC);
-#endif
+// 	pinMode(X_BEGIN_PIN, INPUT);
+	Serial1.print(digitalRead(X_BEGIN_PIN), DEC);
 // 	Serial1.print("X end=");
 // 	Serial1.println(analogRead(X_END_PIN), DEC);
-	Serial1.print("X stepper=");
-	Serial1.println(digitalRead(X_STEP_PIN), DEC);
+	Serial1.print("    X stepper=");
+// 	pinMode(X_STEP_PIN, INPUT);
+	Serial1.print(digitalRead(X_STEP_PIN), DEC);
 
-	Serial1.print("Y begin=");
-#ifdef MY_ROOM
-	Serial1.println(digitalRead(Y_BEGIN_PIN), DEC);
+	Serial1.print("    Y begin=");
+	Serial1.print(digitalRead(Y_BEGIN_PIN), DEC);
+// 	Serial1.print("Y end=");
+// 	Serial1.println(analogRead(Y_END_PIN), DEC);
+	Serial1.print("    Y stepper=");
+	Serial1.print(digitalRead(Y_STEP_PIN), DEC);
+
+	Serial1.print("    Z begin=");
+#ifdef BIG_ROOM
+	Serial1.println(digitalRead(Z_AXE_UP_PIN), DEC);
 #else
-	Serial1.println(analogRead(Y_BEGIN_PIN), DEC);
-#endif
-	Serial1.print("Y end=");
-	Serial1.println(analogRead(Y_END_PIN), DEC);
-	Serial1.print("Y stepper=");
-	Serial1.println(digitalRead(Y_STEP_PIN), DEC);
-
-	Serial1.print("Z begin=");
 	Serial1.println(analogRead(6), DEC);
-
-
+#endif
 }
+
+#ifdef MY_ROOM
+	#define X_AT_BEGIN (HIGH == digitalRead(X_BEGIN_PIN))
+	#define Y_AT_BEGIN (LOW == digitalRead(Y_BEGIN_PIN))
+#else
+	#define X_AT_BEGIN (LOW == digitalRead(X_BEGIN_PIN))
+	#define Y_AT_BEGIN (HIGH == digitalRead(Y_BEGIN_PIN))
+#endif
 bool WaterDoserSystem::park()
 {
 	uint8_t bits = 0x03;
 	
 	errcode = 0;
-	
+#ifdef MY_ROOM
 	servoUp();
-	
+#endif	
 	if (errcode) {
 		return false;
 	}
 	fwdX();
 	fwdY();
-	delay(3000);
+ 	delay(1000);
+	//go fwd until X begin optocoupler is closed
+// 	Serial1.println("fwd...");
 	while (bits) {
-#ifdef MY_ROOM
-		if (LOW == digitalRead(X_BEGIN_PIN))
-#else
- 		Serial1.print("X bsw");
- 		Serial1.println(analogRead(X_BEGIN_PIN - A0), DEC);
-		if (analogRead(X_BEGIN_PIN - A0) < 300)
-#endif
-		{
-// 			Serial1.println(F("stopX"));
+// 		Serial1.print(X_AT_BEGIN, DEC);
+// 		Serial1.println(Y_AT_BEGIN, DEC);
+		if (!X_AT_BEGIN) {
+//  			Serial1.println(F("stopX"));
  			stopX();
 			bits &= 0xFE;
 		}
-#ifdef MY_ROOM
-		if (HIGH == digitalRead(Y_BEGIN_PIN))
-#else
-// 		Serial1.print("Y bsw");
-// 		Serial1.println(analogRead(Y_BEGIN_PIN - A0), DEC);
-
-		if (analogRead(Y_BEGIN_PIN - A0) > 500)
-#endif
-		{
+		if (!Y_AT_BEGIN) {
 			stopY();
-// 			Serial1.println(F("stop Y"));
+//  			Serial1.println(F("stop Y"));
 			bits &= 0xFD;
 		}
 	}//while bits
 // 	delay(1000);
 	bwdX();
 	bwdY();
- 	Serial1.println(F("move X bwd"));
- 	Serial1.println(F("move Y bwd"));
+//  	Serial1.println(F("move X bwd"));
+//  	Serial1.println(F("move Y bwd"));
 
 	bits = 0x03;
 	while (bits) {
-#ifdef MY_ROOM
-		if (HIGH == digitalRead(X_BEGIN_PIN))
-#else
-// 		Serial1.print("x:");Serial1.println(analogRead(X_BEGIN_PIN - A0), DEC);
-		if (analogRead(X_BEGIN_PIN - A0) > 330)
-#endif
-		{
+//  		Serial1.print(X_AT_BEGIN, DEC);
+//  		Serial1.println(Y_AT_BEGIN, DEC);
+		if (X_AT_BEGIN && X_AT_BEGIN) {
 			stopX();
 			bits &= 0xFE;
 		}
-#ifdef MY_ROOM
-		if (LOW == digitalRead(Y_BEGIN_PIN))
-#else
-		if (analogRead(Y_BEGIN_PIN - A0) < 500)
-#endif
-		{
+		if (Y_AT_BEGIN && Y_AT_BEGIN) {
 			stopY();
 			bits &= 0xFD;
 		}
 	}
- 	testES();
+ 	Serial1.println("parked");
+//  	testES();
 	cur_x = 0xFF;
 	cur_y = 0xFF;
+#ifndef MY_ROOM
+		while(!X_AT_SLOT)fwdX();
+		stopX();
+		while(!Y_AT_SLOT)fwdY();
+		stopY();
+		cur_x = 0;
+		cur_y = 0;
+#endif
 	return true;
 }
 
@@ -680,10 +598,11 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 
 #define WDST_STOP		0
 #define WDST_PARK		1
-#define WDST_WAIT_LO_FWD	2
-#define WDST_WAIT_HI_FWD	3
-#define WDST_WAIT_LO_BWD	4
-#define WDST_WAIT_HI_BWD	5
+#define WDST_WAIT_WALL_FWD	2
+#define WDST_WAIT_SLOT_FWD	3
+#define WDST_WAIT_WALL_BWD	4
+#define WDST_WAIT_SLOT_BWD	5
+	
 #if 1 // MY_ROOM
 	uint8_t xs=0, ys=0;
 	pinMode(X_STEP_PIN, INPUT);
@@ -695,32 +614,35 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		3 - move & wait HIGH on *_STEP_PIN
 	 */
 	if (x < cur_x) {
-		Serial1.println("should park X");
-		while (digitalRead(X_STEP_PIN) == HIGH) {
+		while (X_AT_SLOT && X_AT_SLOT && !X_AT_BEGIN) {
 			bwdX();
+			delay(200);
 		}
-		delay(200);
-		xs = WDST_WAIT_HI_BWD/*1*/;
 		bwdX();
+		xs = WDST_WAIT_SLOT_BWD;
 	} else if ( cur_x < x) {
- 		Serial1.println("should move X fwd");
-// 		xs = (digitalRead(X_STEP_PIN)==HIGH ? 3 : 2);
-		xs = (digitalRead(X_STEP_PIN)==HIGH ? WDST_WAIT_HI_FWD : WDST_WAIT_LO_FWD);
+//  		Serial1.println("should move X fwd");
+		while (X_AT_SLOT && X_AT_SLOT) {
+			fwdX();
+			delay(200);
+		}
 		fwdX();
+		xs = WDST_WAIT_SLOT_FWD;
 	}
 	if (y < cur_y) {
-		Serial1.println("should park Y");
-		while (digitalRead(Y_STEP_PIN) == HIGH) {
+ 		while (Y_AT_SLOT && Y_AT_SLOT && !Y_AT_BEGIN) {
 			bwdY();
+			delay(200);
 		}
-		delay(200);
-		ys = WDST_WAIT_HI_BWD/*1*/;
 		bwdY();
+		ys = WDST_WAIT_SLOT_BWD;
 	} else if (cur_y < y) {
-// 		ys = (digitalRead(Y_STEP_PIN)==HIGH ? 3 : 2);
-		ys = (digitalRead(Y_STEP_PIN)==HIGH ? WDST_WAIT_HI_FWD : WDST_WAIT_LO_FWD);
+		while(Y_AT_SLOT && Y_AT_SLOT) {
+			fwdY();
+			delay(200);
+		}
 		fwdY();
-		Serial1.println("should move Y fwd");
+		ys = WDST_WAIT_SLOT_FWD;
 	}
 	uint32_t x_ms=millis(), y_ms=millis(), full_time = millis();
 	Serial1.println(xs ||ys, DEC);
@@ -737,30 +659,29 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			return moveToPos(x,y);
 		}
 		if (xs == WDST_PARK) {
-#ifdef MY_ROOM
-			if (HIGH == digitalRead(X_BEGIN_PIN))
-#else
-			if(analogRead(X_BEGIN_PIN - A0)>= 500)
-#endif
-			{
+			if (X_AT_BEGIN) {
 				Serial1.println("x parked. move fwd");
 				stopX();
 				fwdX();
 				x_ms = millis();
-				xs = WDST_WAIT_LO_FWD;
+				xs = WDST_WAIT_WALL_FWD;
 				cur_x = -1;
 			}
-		} else if (xs == WDST_WAIT_LO_FWD/*2*/) {//wait low state.
-			if (digitalRead(X_STEP_PIN) == LOW) {
-				xs = WDST_WAIT_HI_FWD/*3*/;
+		} else if (xs == WDST_WAIT_WALL_FWD/*2*/) {//wait low state.
+// 			Serial1.print("xs wait wall ");
+// 			Serial1.println(X_AT_SLOT);
+			if (!X_AT_SLOT) {
+				xs = WDST_WAIT_SLOT_FWD/*3*/;
 			}
-		} else if (xs == WDST_WAIT_HI_FWD/*3*/) {//wait HIGH
+		} else if (xs == WDST_WAIT_SLOT_FWD/*3*/) {//wait HIGH
+// 			Serial1.print("xs wait slot ");
+// 			Serial1.println(X_AT_SLOT);
 			if (cur_x == -1) {
-				if (digitalRead(X_STEP_PIN) && digitalRead(X_STEP_PIN) ) {
+				if (X_AT_SLOT && X_AT_SLOT ) {
 					++cur_x;
   					Serial1.print("at x#1:");
  					Serial1.println(cur_x, DEC);
-					xs = ((cur_x < x) ? WDST_WAIT_LO_FWD/*2*/ : WDST_STOP/*0*/);
+					xs = ((cur_x < x) ? WDST_WAIT_WALL_FWD/*2*/ : WDST_STOP/*0*/);
   					Serial1.print("xs=");
   					Serial1.println(xs, DEC);
 					x_ms = millis();
@@ -773,13 +694,13 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				}
 			} else {
 // 				while (true) {
-				if (digitalRead(X_STEP_PIN) == HIGH) {
+				if (X_AT_SLOT) {
 					if (millis() - x_ms > MIN_MOVE_TIME_BTW) {
 						++cur_x;
   						Serial1.print("at x#2:");
   						Serial1.println(cur_x, DEC);
 						x_ms = millis();
-						xs = ((cur_x < x) ? /*2*/WDST_WAIT_LO_FWD : WDST_STOP/*0*/);
+						xs = ((cur_x < x) ? /*2*/WDST_WAIT_WALL_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
 				if (xs == WDST_STOP/*0*/) {
@@ -788,34 +709,31 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 					stopX();
 				}//is xs == 0
 			}//else if cur_x > -1
-		} else if (xs == WDST_WAIT_HI_BWD) {
-// 			Serial1.println(F("xs WDST_WAIT_HI_BWD"));
-#ifdef MY_ROOM
-			if (digitalRead(X_BEGIN_PIN) == HIGH)
-#else
-			if (analogRead(X_BEGIN_PIN-A0) > 500)
-#endif
-			{
+		} else if (xs == WDST_WAIT_SLOT_BWD) {
+// 			Serial1.println(F("xs WDST_WAIT_SLOT_BWD"));
+			if (X_AT_BEGIN) {
  				Serial1.println("ERROR: x at start");
 				stopX();
 				stopY();
 				return false;
 			}
-			if (digitalRead(X_STEP_PIN) == HIGH && (millis() - x_ms > MIN_MOVE_TIME_BTW) ) {
-				Serial1.println(F("xs switch to wait low"));
+			if (X_AT_SLOT && (millis() - x_ms > MIN_MOVE_TIME_BTW) ) {
+// 				Serial1.println(F("xs switch to wait low"));
 				x_ms = millis();
 				--cur_x;
-				xs = WDST_WAIT_LO_BWD;
+				Serial1.print("at x#3:");
+  				Serial1.println(cur_x, DEC);
+				xs = WDST_WAIT_WALL_BWD;
 			}
-		} else if (xs == WDST_WAIT_LO_BWD) {
-// 			Serial1.println(F("xs WDST_WAIT_LO_BWD"));
-			if (digitalRead(X_STEP_PIN) == LOW && (millis() - x_ms > MIN_MOVE_LOW_TIME)) {
-				xs = ( (cur_x == x) ? WDST_STOP : WDST_WAIT_HI_BWD);
-				if(xs == WDST_WAIT_HI_BWD) Serial1.println(F("xs switch to wait high"));
+		} else if (xs == WDST_WAIT_WALL_BWD) {
+// 			Serial1.println(F("xs WDST_WAIT_WALL_BWD"));
+			if (!X_AT_SLOT && (millis() - x_ms > MIN_MOVE_LOW_TIME)) {
+				xs = ( (cur_x == x) ? WDST_STOP : WDST_WAIT_SLOT_BWD);
+// 				if(xs == WDST_WAIT_SLOT_BWD) Serial1.println(F("xs switch to wait high"));
 				x_ms = millis();
 			}
 			if (xs == WDST_STOP) {
-				Serial1.println(F("stopX"));
+// 				Serial1.println(F("stopX"));
 				stopX();
 			}
 		} else {
@@ -826,34 +744,29 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		}
 
 		if (ys == WDST_PARK) {
-#ifdef MY_ROOM
-			if (HIGH == digitalRead(Y_BEGIN_PIN))
-#else
-			if (analogRead(Y_BEGIN_PIN-A0) > 500)
-#endif
-			{
+			if (Y_AT_BEGIN) {
 				Serial1.println("y parked. move fwd");
 				stopY();
 				fwdY();
 				y_ms = millis();
-				ys = WDST_WAIT_LO_FWD;
+				ys = WDST_WAIT_WALL_FWD;
 				cur_y = -1;
 			}
-		} else if (ys == WDST_WAIT_LO_FWD/*2*/) {//wait low state.
-			Serial1.print(F("Y L "));
-			Serial1.println(digitalRead(Y_STEP_PIN), DEC);
-			if (digitalRead(Y_STEP_PIN) == LOW) {
-				ys = WDST_WAIT_HI_FWD/*3*/;
+		} else if (ys == WDST_WAIT_WALL_FWD/*2*/) {//wait low state.
+// 			Serial1.print(F("Y L "));
+// 			Serial1.println(digitalRead(Y_STEP_PIN), DEC);
+			if (!Y_AT_SLOT) {
+				ys = WDST_WAIT_SLOT_FWD/*3*/;
 			}
-		} else if (ys == WDST_WAIT_HI_FWD/*3*/) {//wait HIGH
-			Serial1.print(F("Y H "));
-			Serial1.println(digitalRead(Y_STEP_PIN), DEC);
+		} else if (ys == WDST_WAIT_SLOT_FWD/*3*/) {//wait HIGH
+// 			Serial1.print(F("Y H "));
+// 			Serial1.println(digitalRead(Y_STEP_PIN), DEC);
 			if (cur_y == -1) {
-				if (digitalRead(Y_STEP_PIN) && digitalRead(Y_STEP_PIN) ) {
+				if (Y_AT_SLOT && Y_AT_SLOT ) {
 					++cur_y;
 					Serial1.print("at y#1:");
 					Serial1.println(cur_y, DEC);
-					ys = ((cur_y < y) ? WDST_WAIT_LO_FWD/*2*/ : WDST_STOP/*0*/);
+					ys = ((cur_y < y) ? WDST_WAIT_WALL_FWD/*2*/ : WDST_STOP/*0*/);
 					Serial1.print("ys=");
 					Serial1.println(ys, DEC);
 					y_ms = millis();
@@ -866,13 +779,13 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				}
 			} else {
 // 				while (true) {
-				if (digitalRead(Y_STEP_PIN) == HIGH) {
+				if (Y_AT_SLOT) {
 					if (millis() - y_ms > MIN_MOVE_TIME_BTW) {
 						++cur_y;
 						Serial1.print("at y#2:");
 						Serial1.println(cur_y, DEC);
 						y_ms = millis();
-						ys = ((cur_y < y) ? /*2*/WDST_WAIT_LO_FWD : WDST_STOP/*0*/);
+						ys = ((cur_y < y) ? /*2*/WDST_WAIT_WALL_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
 				if (ys == WDST_STOP/*0*/) {
@@ -881,26 +794,24 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 					stopY();
 				}//is ys == 0
 			}//else if cur_y > -1
-		} else if (ys == WDST_WAIT_HI_BWD) {
-#ifdef MY_ROOM
-			if (digitalRead(Y_BEGIN_PIN) == LOW) 
-#else
-			if (analogRead(Y_BEGIN_PIN-A0) < 500)
-#endif
-			{
+		} else if (ys == WDST_WAIT_SLOT_BWD) {
+			if (Y_AT_BEGIN) {
 				Serial1.println(F("ERROR: y at start"));
 				stopX();
 				stopY();
-				return false;
+				cur_y = -1;
+				return moveToPos(x, y);
 			}
-			if (digitalRead(Y_STEP_PIN) == HIGH && (millis() - y_ms > MIN_MOVE_TIME_BTW) ) {
+			if (Y_AT_SLOT && (millis() - y_ms > MIN_MOVE_TIME_BTW) ) {
 				y_ms = millis();
 				--cur_y;
-				ys = WDST_WAIT_LO_BWD;
+				Serial1.print("at y#3:");
+				Serial1.println(cur_y, DEC);
+				ys = WDST_WAIT_WALL_BWD;
 			}
-		} else if (ys == WDST_WAIT_LO_BWD) {
-			if (digitalRead(Y_STEP_PIN) == LOW && (millis() - y_ms > MIN_MOVE_LOW_TIME)) {
-				ys = ( (cur_y == y) ? WDST_STOP : WDST_WAIT_HI_BWD);
+		} else if (ys == WDST_WAIT_WALL_BWD) {
+			if (!Y_AT_SLOT && (millis() - y_ms > MIN_MOVE_LOW_TIME)) {
+				ys = ( (cur_y == y) ? WDST_STOP : WDST_WAIT_SLOT_BWD);
 				y_ms = millis();
 			}
 			if (ys == WDST_STOP) {

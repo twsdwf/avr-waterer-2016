@@ -38,10 +38,10 @@ PAGE		content
 	#define MIN_MOVE_TIME_BTW	1000
 	#define MIN_MOVE_LOW_TIME		200
 #else
-	#define	WD_SIZE_X	7
-	#define WD_SIZE_Y	9
-	#define MIN_MOVE_TIME_BTW	2000
-	#define MIN_MOVE_LOW_TIME		500
+	#define	WD_SIZE_X			7
+	#define WD_SIZE_Y			10
+	#define MIN_MOVE_TIME_BTW	500
+	#define MIN_MOVE_LOW_TIME	200
 	#define Y_BEGIN_STOPVAL 	400
 	#define BIGROOM_STOPVAL		1001
 #endif
@@ -87,5 +87,6 @@ PAGE		content
 
 #define VBTN_WATERTEST	1
 #define VBTN_WEN		3
+
 
 #endif
