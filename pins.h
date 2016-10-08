@@ -48,12 +48,13 @@
 #ifdef MY_ROOM
 	#define PLANT_LIGHT_PIN 	12
 	#define AQUARIUM_PIN		51
-	#define XY_VCC_AIN			(A0)
+	#define Z_SERVO_FEEDBACK_PIN	(A0)
 	#define XY_VCC_DELTA		5
 	#define Z_AXE_UP_PIN		A6
 #else
 	#define Z_AXE_UP_PIN	 	51
 #endif
+#define Z_AXE_SERVO_PIN		46
 
 
 #endif

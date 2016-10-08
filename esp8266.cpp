@@ -35,8 +35,8 @@ bool ESP8266::sendCmd_P(PGM_P cmd, bool wait_reply, PGM_P reply_ok, uint32_t tim
 		}
 	}
 	esp_buf[ bi ] = 0;
-// 	Serial1.print(F("sendCmd_P:"));
-// 	Serial1.println((__FlashStringHelper*)cmd);
+ 	Serial1.print(F("sendCmd_P:"));
+	Serial1.println((__FlashStringHelper*)cmd);
 	com->println((__FlashStringHelper*)cmd);
 	if (!wait_reply) {
 		return true;
@@ -53,8 +53,8 @@ bool ESP8266::sendCmd_P(PGM_P cmd, bool wait_reply, PGM_P reply_ok, uint32_t tim
 			}
 		}
 		esp_buf[bi] = 0;
-// 		Serial1.print("read:");
-// 		Serial1.println(esp_buf);
+		Serial1.print("read:");
+		Serial1.println(esp_buf);
 		if (strstr_P(esp_buf, PSTR("ready")) /*&& !strstr_P("RST", cmd)*/) {
 			start = millis();
 			bi = 0;
@@ -83,9 +83,9 @@ bool ESP8266::sendCmd_P(PGM_P cmd, bool wait_reply, PGM_P reply_ok, uint32_t tim
 		if (reply_ok != NULL) {
 			esp_buf[bi] = 0;
 			if (old_bi != bi) {
-//   				Serial1.print(F("got reply:["));
-//   				Serial1.print(esp_buf);
-//   				Serial1.println(F("]"));
+  				Serial1.print(F("got reply:["));
+  				Serial1.print(esp_buf);
+  				Serial1.println(F("]"));
 			}
 			char *ptr = strstr_P(esp_buf, reply_ok);
 			if (ptr != NULL) {

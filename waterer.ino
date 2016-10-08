@@ -12,12 +12,14 @@
 #define LEDS_ADDR			39
 
 #include <Wire.h>
+#include <avr/wdt.h>
 
 #include "RTClib.h"
 #include <AT24Cxxx.h>
 #include "freemem.h"
 #include <math.h>
 #include <PCF8574.h>
+#include <Servo.h>
 #ifdef MY_ROOM
 	#include <BH1750.h>
 #endif
@@ -55,18 +57,23 @@ extern "C" {
 #define USE_ESP8266
 	BH1750 lightMeter;
 #endif
+
+// #define USE_ESP8266
+
 #ifdef USE_ESP8266
 	ESP8266 esp8266(&Serial);
 #endif
+	
+Servo ZS;
 volatile uint32_t last_check_time = 0;
 
 RTC_DS1307 clock;
 
 AT24Cxxx mem(I2C_MEMORY_ADDRESS);
 
-#ifdef MY_ROOM
+// #ifdef MY_ROOM
 	MCP23017 leds;
-#endif
+// #endif
 	
 extern Configuration g_cfg;
 
@@ -205,6 +212,7 @@ void printGcfg(HardwareSerial*output)
 bool doCommand(char*cmd, HardwareSerial*output)
 {
 	static const char time_read_fmt[] /*PROGMEM*/ = "%d:%d:%d %d.%d.%d %d";
+	static int pos = 180;
 	/*if (IS(cmd,"er", 2)) {
 		Serial1.println(EEPROM.read(33));
 		
@@ -308,7 +316,15 @@ bool doCommand(char*cmd, HardwareSerial*output)
 	} else if (cmd[0]== 'U') {
 		water_doser.servoUp();
 	} else if (cmd[0]=='D') {
-		water_doser.servoDown();
+		if (cmd[1] == 'F') {
+		 water_doser.servoDown();
+		} else if(cmd[1] == 'M') {
+			pos -= 10;
+			water_doser.servoMove(pos);
+		} else if(cmd[1] == 'R') {
+			pos = 180;
+			water_doser.servoMove(pos);
+		}
 	} else if ('G'==cmd[0]) {
 		char *ptr = cmd + 1;
 		if (cmd[1] == 'A') {
@@ -631,14 +647,16 @@ void processPacket(char*cmd)
 
 void setup()
 {
+	wdt_disable();
 	Serial1.begin(BT_BAUD);
  	Serial1.println(F("HELLO;"));
+	
  	Wire.begin();
   	clock.begin();
  	water_doser.begin();
 // 	water_doser.testAll();
-// 	return;
-#ifdef MY_ROOM
+// #ifdef USE_LEDS
+#if 1
 	leds.begin(LEDS_ADDR);
 	for (uint8_t i = 0; i < 16; ++i) {
 		leds.pinMode(i, OUTPUT);
@@ -662,15 +680,15 @@ void setup()
 	delay(400);
 	leds.digitalWrite(LED_YELLOW, LOW);	
 #endif
-// return;
 #ifdef USE_ESP8266
+	Serial1.println(F("Init ESP8266..."));
  	esp8266.begin(38400, ESP_RST_PIN);
  	esp8266.setPacketParser(processPacket);
  	esp8266.connect();
+	Serial1.println(F("Init ESP8266...[done]"));
 #endif
 // 	Wire.begin();
 //  	clock.begin();
-
 	//leds.writeGPIOAB(0xFFFF);
 // 	Serial1.println(freeRam(), DEC);
 #ifdef MY_ROOM
@@ -732,7 +750,7 @@ bool checkContinue()
 		leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
 		delay(1000);
 	}
-	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
+// 	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
 #endif
 	return true;//g_cfg.config.enabled;
 }
@@ -761,7 +779,7 @@ void loop()
 #ifdef USE_ESP8266	
 	esp8266.process();
 #endif
-//  	return;
+
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
 	if (now_m > 2400 || now.year() < 2016) {
@@ -797,7 +815,8 @@ void loop()
 		digitalWrite(AQUARIUM_PIN, LOW);
 		pinMode(PLANT_LIGHT_PIN, OUTPUT);
 		digitalWrite(PLANT_LIGHT_PIN, LOW);
-		leds.digitalWrite(LED_YELLOW, _pulse_state);
+		leds.digitalWrite(LED_YELLOW, 0);
+		leds.digitalWrite(LED_BLUE, 0);
 	}
 #endif
 	if ( g_cfg.config.enabled

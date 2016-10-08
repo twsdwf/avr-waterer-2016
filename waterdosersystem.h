@@ -8,7 +8,8 @@
 #ifndef USE_CLI
 	#include"bootscreen.h"
 #endif
-// #include <ShiftOut.h>
+
+#include <Servo.h>
 
 typedef enum AirTime{
 	atShort=1,
@@ -19,12 +20,13 @@ typedef enum AirTime{
 class WaterDoserSystem
 {
 protected:
+	Servo z_axe;
 	uint8_t  expander_addr;
 	uint16_t expander_state;
 	I2CExpander* exp;
 	int8_t cur_x, cur_y, errcode;
 // 	Servo srv;
-	int readCmdStatus(uint32_t timeout=0, char*replyOK=NULL);
+// 	int readCmdStatus(uint32_t timeout=0, char*replyOK=NULL);
 // 	bool execCmd(char*cmd, uint32_t timeout = 0, uint8_t tries = 0, char*replyOK = NULL);
 	void bwdX();
 	void fwdX();
@@ -36,12 +38,14 @@ protected:
 	bool nextY();
 	void dope(AirTime at=atMedium);
 public:
+	int getCurPos();
+	void servoMove(uint8_t new_pos);
 	bool park();
 	bool parkX();
 	bool parkY();
 	void servoUp();
 	bool servoDown();
-	void servoUnbind();
+// 	void servoUnbind();
 	void testES();
 	void testAll();
 	WaterDoserSystem();
