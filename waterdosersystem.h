@@ -21,7 +21,7 @@ class WaterDoserSystem
 {
 protected:
 	Servo z_axe;
-	uint8_t  expander_addr;
+	uint8_t  expander_addr, z_pos;
 	uint16_t expander_state;
 	I2CExpander* exp;
 	int8_t cur_x, cur_y, errcode;

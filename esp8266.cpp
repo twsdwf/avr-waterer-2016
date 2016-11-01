@@ -53,8 +53,8 @@ bool ESP8266::sendCmd_P(PGM_P cmd, bool wait_reply, PGM_P reply_ok, uint32_t tim
 			}
 		}
 		esp_buf[bi] = 0;
-		Serial1.print("read:");
-		Serial1.println(esp_buf);
+// 		Serial1.print("read:");
+// 		Serial1.println(esp_buf);
 		if (strstr_P(esp_buf, PSTR("ready")) /*&& !strstr_P("RST", cmd)*/) {
 			start = millis();
 			bi = 0;

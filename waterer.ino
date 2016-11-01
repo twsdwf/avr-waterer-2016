@@ -20,6 +20,7 @@
 #include <math.h>
 #include <PCF8574.h>
 #include <Servo.h>
+#include <OneWire.h>
 #ifdef MY_ROOM
 	#include <BH1750.h>
 #endif
@@ -43,7 +44,7 @@
 #include "wateringcontroller.h"
 // #include "waterstorage.h"
 #include "esp8266.h"
-
+#include "wizard.h"
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
@@ -54,8 +55,12 @@ extern "C" {
 ***************************************************************************************************/
 
 #ifdef MY_ROOM
-#define USE_ESP8266
-	BH1750 lightMeter;
+	OneWire ds(12);
+	//28 8F 46 78 6 0 0 C0
+	uint8_t addr_out[8] = {0x28,0x8f,0x46,0x78,0x6,0x0,0,0xc0}, addr_in[8] = {0x28,0x1C,0x63,0x78,0x6,0,0,0x02};
+// #define USE_ESP8266
+// 	BH1750 lightMeter;
+// 	LiquidCrystal595Rus lcd();
 #endif
 
 // #define USE_ESP8266
@@ -88,6 +93,8 @@ int8_t iForceWatering = 0;
 
 // ErrLogger logger;
 extern char*str;
+
+// void run_wizard(uint8_t show_hello=1);
 
 /** ************************************************************************************************
  * 			functions
@@ -269,7 +276,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 #ifdef MY_ROOM
 		if (cmd[4]=='?') {
 			output->print(F("lux:"));
-			output->println(lightMeter.readLightLevel(), DEC);
+// 			output->println(lightMeter.readLightLevel(), DEC);
 		} else if (cmd[3] == '=') {
 			g_cfg.config.lux_barrier_value = atoi(cmd+5);
 			g_cfg.writeGlobalConfig();
@@ -437,6 +444,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			} else if(IS_P(cmd+4+4, PSTR("all"), 3)) {
 				for (uint8_t i = 0; i < g_cfg.config.pots_count; ++i ) {
 					dumpPotConfig(i, output);
+					output->println();
 				}
 			} else if (isdigit(*(cmd+4+4))) {
 				int index = -1;
@@ -444,6 +452,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 				set_field<int>(index, &ptr);
 				if (index >=0 && index < g_cfg.config.pots_count) {
 					dumpPotConfig(index, output);
+					output->println();
 				} else {
 					return false;
 				}
@@ -577,9 +586,13 @@ typedef struct wateringConfig{
 	} else if(IS_P(cmd,PSTR("testall") ,7)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 		wctl.doPotService(false, output);
+	} else if (IS_P(cmd, PSTR("wizard"), 6)) {
+		Wizard w;
+		w.run();
 	}
 	return true;
 }
+
 
 static char cmdbuf[80]={0};
 
@@ -692,9 +705,9 @@ void setup()
 	//leds.writeGPIOAB(0xFFFF);
 // 	Serial1.println(freeRam(), DEC);
 #ifdef MY_ROOM
- 	lightMeter.begin();
-	pinMode(PLANT_LIGHT_PIN, OUTPUT);
-	digitalWrite(PLANT_LIGHT_PIN, LOW);
+//  	lightMeter.begin();
+// 	pinMode(PLANT_LIGHT_PIN, OUTPUT);
+// 	digitalWrite(PLANT_LIGHT_PIN, LOW);
 #endif
 
    	g_cfg.begin();
@@ -727,6 +740,18 @@ void setup()
 		wctl.setStatDay(now.day());
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 	}
+	uint8_t addr[8];
+	while ( ds.search(addr)) {
+		Serial1.print("ROM =");
+		for(int i = 0; i < 8; i++) {
+			Serial1.write(' ');
+			Serial1.print(addr[i], HEX);
+		}
+	}
+     Serial1.println("No more addresses.");
+//     Serial1.println();
+    ds.reset_search();
+//     delay(250);
 	Serial1.println(F("setup() end"));
 }
 
@@ -755,6 +780,32 @@ bool checkContinue()
 	return true;//g_cfg.config.enabled;
 }
 
+uint16_t last_temp_read = 0;
+
+float readTemp(uint8_t*addr)
+{
+	uint8_t data[9];
+	ds.reset();
+	ds.select(addr);
+	ds.write(0x44, 1);
+	delay(1000);
+	ds.reset();
+	ds.select(addr);    
+	ds.write(0xBE);
+	for (uint8_t i = 0; i < 9; i++) {           // we need 9 bytes
+		data[i] = ds.read();
+		Serial1.print(data[i], HEX);
+		Serial1.print(" ");
+	}
+	int16_t raw = (data[1] << 8) | data[0];
+	byte cfg = (data[4] & 0x60);
+	// at lower res, the low bits are undefined, so let's zero them
+	if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+	else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+	else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+	//// default is 12 bit resolution, 750 ms conversion time
+	return (float)raw / 16.0;
+}
 
 void loop()
 {
@@ -782,6 +833,39 @@ void loop()
 
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
+	if (now.minute()%5 == 0 && now_m!=last_temp_read) {
+		last_temp_read = now_m;
+		float celsius = readTemp(addr_out);
+		Serial1.print("temp outside:");
+		Serial1.println(celsius);
+#ifdef USE_ESP8266
+		char udp[16], buf[24];
+		esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
+		if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
+			int len = sprintf(udp, "TO=%d\0", round(celsius*100)); 
+			sprintf(buf, "AT+CIPSEND=3,%d", len);
+// 			Serial.print(udp);
+// 			Serial.write(0);
+			esp8266.sendCmd(buf, true, ">", 4000);
+			esp8266.sendCmd(udp, true, "OK", 4000);
+		}
+#endif
+		celsius = readTemp(addr_in);
+		Serial1.print("temp indoor:");
+		Serial1.println(celsius);
+#ifdef USE_ESP8266
+		esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
+		if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
+			int len = sprintf(udp, "TI=%d\0", round(celsius*100)); 
+			sprintf(buf, "AT+CIPSEND=3,%d", len);
+// 			Serial.print(udp);
+// 			Serial.write(0);
+			esp8266.sendCmd(buf, true, ">", 4000);
+			esp8266.sendCmd(udp, true, "OK", 4000);
+		}
+#endif
+	}
+	
 	if (now_m > 2400 || now.year() < 2016) {
 #ifdef USE_ESP8266
 		now = esp8266.getTimeFromNTPServer();
@@ -798,13 +882,13 @@ void loop()
 		pinMode(AQUARIUM_PIN, OUTPUT);
 		digitalWrite(AQUARIUM_PIN, HIGH);
 		if (millis()-last_light_en > 60000UL) {
-			uint16_t lux = lightMeter.readLightLevel();
-			pinMode(PLANT_LIGHT_PIN, OUTPUT);
+			uint16_t lux = 16000;// lightMeter.readLightLevel();
+// 			pinMode(PLANT_LIGHT_PIN, OUTPUT);
 			if (lux < g_cfg.config.lux_barrier_value) {
-				digitalWrite(PLANT_LIGHT_PIN, HIGH);
+// 				digitalWrite(PLANT_LIGHT_PIN, HIGH);
 				last_light_en = millis();
 			} else {
-				digitalWrite(PLANT_LIGHT_PIN, LOW);
+// 				digitalWrite(PLANT_LIGHT_PIN, LOW);
 			}
 		}
 	} else {
@@ -813,8 +897,8 @@ void loop()
 		leds.digitalWrite(LED_GREEN, LOW);
 		pinMode(AQUARIUM_PIN, OUTPUT);
 		digitalWrite(AQUARIUM_PIN, LOW);
-		pinMode(PLANT_LIGHT_PIN, OUTPUT);
-		digitalWrite(PLANT_LIGHT_PIN, LOW);
+// 		pinMode(PLANT_LIGHT_PIN, OUTPUT);
+// 		digitalWrite(PLANT_LIGHT_PIN, LOW);
 		leds.digitalWrite(LED_YELLOW, 0);
 		leds.digitalWrite(LED_BLUE, 0);
 	}

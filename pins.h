@@ -46,7 +46,7 @@
 #define X_BEGIN_PIN			23
 #define Y_BEGIN_PIN			52 // digital!
 #ifdef MY_ROOM
-	#define PLANT_LIGHT_PIN 	12
+// 	#define PLANT_LIGHT_PIN 	12
 	#define AQUARIUM_PIN		51
 	#define Z_SERVO_FEEDBACK_PIN	(A0)
 	#define XY_VCC_DELTA		5
