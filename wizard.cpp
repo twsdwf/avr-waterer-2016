@@ -3,10 +3,12 @@
 #include "configuration.h"
 #include "i2cexpander.h"
 #include "waterdosersystem.h"
+#include "esp8266.h"
 
 extern Configuration g_cfg;
 extern WaterDoserSystem water_doser;
 extern I2CExpander i2cExpander;
+extern ESP8266 esp8266;
 
 Wizard::Wizard()
 {
@@ -19,6 +21,71 @@ Wizard::~Wizard()
 	if(this->i2c_devs) {
 		delete[] i2c_devs;
 	}
+}
+
+void Wizard::cfg_run()
+{
+	Serial1.println(F("=== CONFIG WIZARD ==="));
+/*	uint16_t val = (uint16_t)g_cfg.config.enabled;
+// 	print_field<uint16_t>(val);
+	val = (uint16_t)g_cfg.config.flags;
+	print_field<uint16_t>(output, val);
+	print_field<uint8_t>(output, g_cfg.config.pots_count);
+	print_field<uint16_t>(output, g_cfg.config.i2c_pwron_timeout);
+	print_field<uint16_t>(output, g_cfg.config.sensor_init_time);
+	print_field<uint16_t>(output, g_cfg.config.sensor_read_time);
+	print_field<uint16_t>(output, g_cfg.config.water_start_time);
+	print_field<uint16_t>(output, g_cfg.config.water_end_time);
+	print_field<uint16_t>(output, g_cfg.config.water_start_time_we);
+	print_field<uint16_t>(output, g_cfg.config.water_end_time_we);
+	print_field<uint8_t>(output, g_cfg.config.sensor_measures);
+	print_field<uint8_t>(output, g_cfg.config.test_interval, ';');*/
+	uint16_t h,m;
+	ask_uint16(F("I2C power-on time, ms"), 0, 60000, g_cfg.config.i2c_pwron_timeout);
+	ask_uint16(F("Sensor pre-read time, ms"), 0, 60000, g_cfg.config.sensor_init_time);
+	ask_uint16(F("Sensor pause between read, ms"), 0, 60000, g_cfg.config.sensor_read_time);
+	h = g_cfg.config.sensor_measures;
+	g_cfg.config.sensor_measures = ask_uint16(F("Sensor measures"), 0, 20, h);
+	
+	h = g_cfg.config.pots_count;
+	g_cfg.config.pots_count = ask_uint16(F("Pots count"), 0, 100, h);
+	
+	h=g_cfg.config.water_start_time/100, m=g_cfg.config.water_start_time%100;
+	ask_uint16(F("Monday-Friday watering start, hour"), 0, 24, h);
+	ask_uint16(F("Monday-Friday watering start, minute"), 0, 60, m);
+	g_cfg.config.water_start_time = h * 100 + m;
+	h = g_cfg.config.water_end_time/100;
+	m = g_cfg.config.water_end_time%100;
+	ask_uint16(F("Monday-Friday watering end, hour"), 0, 24, h);
+	ask_uint16(F("Monday-Friday watering end, minute"), 0, 60, m);
+	g_cfg.config.water_end_time = h * 100 + m;
+
+	h = g_cfg.config.water_start_time_we / 100, m = g_cfg.config.water_start_time_we % 100;
+	ask_uint16(F("Weekend watering start, hour"), 0, 24, h);
+	ask_uint16(F("Weekend watering start, minute"), 0, 60, m);
+	g_cfg.config.water_start_time = h * 100 + m;
+	h = g_cfg.config.water_end_time_we / 100;
+	m = g_cfg.config.water_end_time_we % 100;
+	ask_uint16(F("Weekend watering end, hour"), 0, 24, h);
+	ask_uint16(F("Weekend watering end, minute"), 0, 60, m);
+	g_cfg.config.water_end_time_we = h * 100 + m;
+	
+	h = g_cfg.config.test_interval;
+	g_cfg.config.test_interval = ask_uint16(F("Test interval, minutes"), 0, 180, h);
+	
+	g_cfg.config.enabled = (ask_char(F("Enable watering(Y/N)?"), "YN") == 'Y');
+	h = (g_cfg.config.flags & F_ESP_USING)? 1 : 0;
+	m = (ask_char(F("Use esp8266(Y/N)?"), "YN") == 'Y') ? 1 : 0;
+	if ( m > h ) {
+		esp8266.begin(38400, ESP_RST_PIN);
+	}
+	g_cfg.config.flags &= ~F_ESP_USING;
+	if (m) {
+		g_cfg.config.flags |= F_ESP_USING;
+	}
+	
+	g_cfg.writeGlobalConfig();
+	Serial1.println(F("saved"));
 }
 
 char Wizard::ask_char(const __FlashStringHelper* promt, char*values)
@@ -44,6 +111,49 @@ char Wizard::ask_char(const __FlashStringHelper* promt, char*values)
 	Serial1.println();
 	return 'X';
 }//sub
+
+
+uint16_t Wizard::ask_uint16(const __FlashStringHelper* promt, uint16_t min, uint16_t max, uint16_t& curval)
+{
+	delay(500);
+	while(Serial1.available()) Serial1.read();
+	Serial1.print(promt);
+	Serial1.print("(current value ");
+	Serial1.print(curval, DEC);
+	Serial1.print("): ");
+	Serial1.flush();
+	uint16_t ret = 0, nch=0;
+	while (1) {
+		if (Serial1.available()) {
+			char ch = Serial1.read();
+			Serial1.write(ch);Serial1.flush();
+			if(isdigit(ch)) {
+				ret *= 10;
+				ret += (ch - '0');
+				++nch;
+			} else if (ch == 10 || ch == 13) {
+				if (nch > 0 && ret >= min && ret <= max || nch ==0) {
+					if (nch) {
+						curval = ret;
+					} else {
+						ret = curval;
+					}
+					Serial1.println();
+					return ret;
+				} else {
+					Serial1.println(F("\r\nERROR: value is out of range"));
+					return ask_uint16(promt, min, max, curval);
+				}
+			} else if (ch == 'X') {
+				Serial1.println();
+				return -1;
+			}
+		}//if avail
+	}//while 1
+	Serial1.println();
+	return -1;
+
+}
 
 int Wizard::ask_int(const __FlashStringHelper* promt, int min, int max)
 {

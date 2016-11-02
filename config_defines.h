@@ -63,6 +63,8 @@ PAGE		content
 
 #define MAX_WFS_COUNT	2
 
+#define F_ESP_USING		(1<<1)
+
 #define RAM_CUR_STATE			(8)
 #define CUR_STATE_IDLE			(0)
 #define CUR_STATE_READ			(1)

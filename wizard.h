@@ -11,6 +11,7 @@ public:
 	Wizard();
 	~Wizard();
 	void run(uint8_t show_hello=1);
+	void cfg_run();
 	void hello();
 	void exit(int pi);
 	
@@ -19,6 +20,7 @@ public:
 	
 	char ask_char(const __FlashStringHelper* promt, char*values);
 	int ask_int(const __FlashStringHelper* promt, int min, int max);
+	uint16_t ask_uint16(const __FlashStringHelper* promt, uint16_t min, uint16_t max, uint16_t& curval);
 	void ask_str(const __FlashStringHelper* promt, char*buf, int maxlen);
 	
 };

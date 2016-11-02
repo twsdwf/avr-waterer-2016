@@ -63,11 +63,8 @@ extern "C" {
 // 	LiquidCrystal595Rus lcd();
 #endif
 
-// #define USE_ESP8266
 
-#ifdef USE_ESP8266
-	ESP8266 esp8266(&Serial);
-#endif
+ESP8266 esp8266(&Serial);
 	
 Servo ZS;
 volatile uint32_t last_check_time = 0;
@@ -407,13 +404,11 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			clock.adjust(td);
 			delay(1000);
 		}
-#ifdef USE_ESP8266
-		else if(IS_P(cmd+5,PSTR("adj"), 3)) {
+		else if ( (g_cfg.config.flags & F_ESP_USING) && IS_P(cmd+5,PSTR("adj"), 3)) {
 			DateTime now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
 			print_now(output);
 		}
-#endif
 		else {
 			return false;
 		}
@@ -541,7 +536,9 @@ typedef struct wateringConfig{
 			printGcfg(output);
 		} else if (IS_P(cmd + 4, PSTR("set"), 3)) {
 			//print_field<uint16_t>(gcfg.config.enabled);
-			char *ptr = cmd + 4 + 4;
+			Wizard w;
+			w.cfg_run();
+			/*char *ptr = cmd + 4 + 4;
 			uint16_t val = g_cfg.config.flags;
 			set_field<uint16_t>(val, &ptr);
 			g_cfg.config.flags = val;
@@ -559,7 +556,7 @@ typedef struct wateringConfig{
 			g_cfg.writeGlobalConfig();
 // 			printGcfg();
 			g_cfg.readGlobalConfig();
-			printGcfg(output);
+			printGcfg(output);*/
 		}
 	} else if (IS_P(cmd, PSTR("start"), 5)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
@@ -619,7 +616,6 @@ void checkCommand()
 
 }//sub
 
-#ifdef USE_ESP8266
 void processPacket(char*cmd)
 {
 	Serial1.print(F("get cmd from esp ["));
@@ -656,7 +652,7 @@ void processPacket(char*cmd)
 // 			esp8266.sendCmd(str, true, "OK", 4000, true);
 		}
 }
-#endif
+
 
 void setup()
 {
@@ -693,13 +689,14 @@ void setup()
 	delay(400);
 	leds.digitalWrite(LED_YELLOW, LOW);	
 #endif
-#ifdef USE_ESP8266
-	Serial1.println(F("Init ESP8266..."));
- 	esp8266.begin(38400, ESP_RST_PIN);
+
  	esp8266.setPacketParser(processPacket);
- 	esp8266.connect();
-	Serial1.println(F("Init ESP8266...[done]"));
-#endif
+	if (g_cfg.config.flags & F_ESP_USING) {
+		Serial1.println(F("Init ESP8266..."));
+		esp8266.begin(38400, ESP_RST_PIN);
+		esp8266.connect();
+		Serial1.println(F("Init ESP8266...[done]"));
+	}
 // 	Wire.begin();
 //  	clock.begin();
 	//leds.writeGPIOAB(0xFFFF);
@@ -827,51 +824,51 @@ void loop()
    	checkCommand();
 	delay(500);
 // 	return;
-#ifdef USE_ESP8266	
-	esp8266.process();
-#endif
+	if (g_cfg.config.flags & F_ESP_USING) {
+		esp8266.process();
+	}
 
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
 	if (now.minute()%5 == 0 && now_m!=last_temp_read) {
+		char udp[16], buf[24];
 		last_temp_read = now_m;
 		float celsius = readTemp(addr_out);
 		Serial1.print("temp outside:");
 		Serial1.println(celsius);
-#ifdef USE_ESP8266
-		char udp[16], buf[24];
-		esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
-		if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
-			int len = sprintf(udp, "TO=%d\0", round(celsius*100)); 
-			sprintf(buf, "AT+CIPSEND=3,%d", len);
-// 			Serial.print(udp);
-// 			Serial.write(0);
-			esp8266.sendCmd(buf, true, ">", 4000);
-			esp8266.sendCmd(udp, true, "OK", 4000);
+		if (g_cfg.config.flags & F_ESP_USING) {
+			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
+			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
+				int len = sprintf(udp, "TO=%d\0", round(celsius*100)); 
+				sprintf(buf, "AT+CIPSEND=3,%d", len);
+	// 			Serial.print(udp);
+	// 			Serial.write(0);
+				esp8266.sendCmd(buf, true, ">", 4000);
+				esp8266.sendCmd(udp, true, "OK", 4000);
+			}
 		}
-#endif
 		celsius = readTemp(addr_in);
 		Serial1.print("temp indoor:");
 		Serial1.println(celsius);
-#ifdef USE_ESP8266
-		esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
-		if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
-			int len = sprintf(udp, "TI=%d\0", round(celsius*100)); 
-			sprintf(buf, "AT+CIPSEND=3,%d", len);
-// 			Serial.print(udp);
-// 			Serial.write(0);
-			esp8266.sendCmd(buf, true, ">", 4000);
-			esp8266.sendCmd(udp, true, "OK", 4000);
+		if (g_cfg.config.flags & F_ESP_USING) {
+			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
+			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
+				int len = sprintf(udp, "TI=%d\0", round(celsius*100)); 
+				sprintf(buf, "AT+CIPSEND=3,%d", len);
+	// 			Serial.print(udp);
+	// 			Serial.write(0);
+				esp8266.sendCmd(buf, true, ">", 4000);
+				esp8266.sendCmd(udp, true, "OK", 4000);
+			}
 		}
-#endif
 	}
 	
 	if (now_m > 2400 || now.year() < 2016) {
-#ifdef USE_ESP8266
-		now = esp8266.getTimeFromNTPServer();
-		clock.adjust(now);
-		print_now(&Serial1);
-#endif
+		if (g_cfg.config.flags & F_ESP_USING) {
+			now = esp8266.getTimeFromNTPServer();
+			clock.adjust(now);
+			print_now(&Serial1);
+		}
  		Serial1.println(F("bad time read"));
 		return;
 	}
@@ -945,10 +942,10 @@ void loop()
 // 		Serial1.println("g_cfg.midnight_tasks(); ended");
 // 		Serial1.flush();
 		midnight_skip = true;
-#ifdef USE_ESP8266
-		now = esp8266.getTimeFromNTPServer();
-		clock.adjust(now);
-#endif
+		if (g_cfg.config.flags & F_ESP_USING) {
+			now = esp8266.getTimeFromNTPServer();
+			clock.adjust(now);
+		}
 	}
 // 		- last_check_time > g_cfg.config.
 //  	Serial1.println("ping");
