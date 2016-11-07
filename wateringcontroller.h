@@ -8,10 +8,10 @@ protected:
 	I2CExpander*i2cexp;
 	sensorValues* _sensor_values;
 	uint8_t sv_count;
-	void writeDayML(uint8_t index, uint16_t val);
 	void incDayML(uint8_t index, uint16_t inc);
 	uint16_t readDayML(uint8_t index);
 public:
+	void writeDayML(uint8_t index, uint16_t val);
 	WateringController(I2CExpander* _exp=NULL);
 	virtual ~WateringController();
 	void init(I2CExpander* _exp);

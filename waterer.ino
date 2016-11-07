@@ -84,6 +84,7 @@ extern Configuration g_cfg;
 extern WaterDoserSystem water_doser;
 
 I2CExpander i2cExpander;
+
 WateringController wctl;
 
 int8_t iForceWatering = 0;
@@ -169,24 +170,81 @@ void dumpPotConfig(uint8_t index, HardwareSerial* output)
 		print_field<uint16_t>(output, pot.pgm.hum_and_dry.max_ml,';');
 	} else {
 		output->print(F("???"));
-	}// 	print_field<uint32_t>(pot.sensor.dry_freq);
-// 	print_field<uint32_t>(pot.sensor.wet_freq);
-// 	print_field<uint32_t>(pot.sensor.no_soil_freq);
-// 	print_field<uint16_t>(pot.sensor.noise_delta);
-// 	print_field<uint8_t>(pot.wc.doser);
-// 	print_field<uint8_t>(pot.wc.bowl);
-// 	print_field<uint8_t>(pot.wc.flags);
-// 	print_field<uint8_t>(pot.wc.ml);
-// 	Serial1.print(pot.name);
-// 	Serial1.println(';');
+	}
 }
 
+uint16_t last_temp_read = 0;
+
+float readTemp(uint8_t*addr)
+{
+	uint8_t data[9];
+	ds.reset();
+	ds.select(addr);
+	ds.write(0x44);
+	delay(1000);
+	ds.reset();
+	ds.select(addr);    
+	ds.write(0xBE);
+	for (uint8_t i = 0; i < 9; i++) {           // we need 9 bytes
+		data[i] = ds.read();
+		Serial1.print(data[i], HEX);
+		Serial1.print(" ");
+	}
+	
+	int16_t raw = (data[1] << 8) | data[0];
+	if (raw == 0xffff) {
+		Serial1.println(F("Error while read device"));
+		return -255.;
+	}
+	byte cfg = (data[4] & 0x60);
+	// at lower res, the low bits are undefined, so let's zero them
+	if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+	else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+	else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+	//// default is 12 bit resolution, 750 ms conversion time
+	return (float)raw / 16.0;
+}
+
+void readDS18B20(bool send=true)
+{
+	char udp[16], buf[24];
+	float celsius = readTemp(addr_out);
+	Serial1.print(F("temp outside:"));
+	Serial1.println(celsius);
+	if (send && (g_cfg.config.esp_en)) {
+		esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
+		if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
+			int len = sprintf(udp, "TO=%d\0", round(celsius*100)); 
+			sprintf(buf, "AT+CIPSEND=3,%d", len);
+// 			Serial.print(udp);
+// 			Serial.write(0);
+			esp8266.sendCmd(buf, true, ">", 4000);
+			esp8266.sendCmd(udp, true, "OK", 4000);
+		}
+	}
+	celsius = readTemp(addr_in);
+	Serial1.print(F("temp indoor:"));
+	Serial1.println(celsius);
+	if (send && (g_cfg.config.esp_en)) {
+		esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
+		if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
+			int len = sprintf(udp, "TI=%d\0", round(celsius*100)); 
+			sprintf(buf, "AT+CIPSEND=3,%d", len);
+// 			Serial.print(udp);
+// 			Serial.write(0);
+			esp8266.sendCmd(buf, true, ">", 4000);
+			esp8266.sendCmd(udp, true, "OK", 4000);
+		}
+	}
+}
 
 void printGcfg(HardwareSerial*output)
 {
 	uint16_t val = (uint16_t)g_cfg.config.enabled;
 // 	print_field<uint16_t>(val);
 	val = (uint16_t)g_cfg.config.flags;
+	print_field<uint16_t>(output, val);
+	val = (uint16_t)g_cfg.config.esp_en;
 	print_field<uint16_t>(output, val);
 	print_field<uint8_t>(output, g_cfg.config.pots_count);
 	print_field<uint16_t>(output, g_cfg.config.i2c_pwron_timeout);
@@ -198,19 +256,6 @@ void printGcfg(HardwareSerial*output)
 	print_field<uint16_t>(output, g_cfg.config.water_end_time_we);
 	print_field<uint8_t>(output, g_cfg.config.sensor_measures);
 	print_field<uint8_t>(output, g_cfg.config.test_interval, ';');
-/*			set_field<uint16_t>(val, &ptr);
-			g_cfg.config.flags = val;
-			g_cfg.config.enabled = val & 1;
-			set_field<uint8_t>(g_cfg.config.pots_count, &ptr);
-			set_field<uint16_t>(g_cfg.config.i2c_pwron_timeout, &ptr);
-			set_field<uint16_t>(g_cfg.config.sensor_init_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.sensor_read_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_start_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_end_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_start_time_we, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_end_time_we, &ptr);
-			set_field<uint8_t>(g_cfg.config.sensor_measures, &ptr);
-*/
 }
 
 bool doCommand(char*cmd, HardwareSerial*output)
@@ -245,7 +290,9 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		}
 		Serial1.println("done;");
 	} else */
-	if (IS_P(cmd, PSTR("sdump"), 5)) {
+	if (IS_P(cmd, PSTR("temp?"), 5)) {
+		readDS18B20(false);
+	} else if (IS_P(cmd, PSTR("sdump"), 5)) {
 // 		wctl.run_checks();
 		wctl.dumpSensorValues(output);
 	} else if (IS_P(cmd, PSTR("pcf"), 3)) {
@@ -404,7 +451,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			clock.adjust(td);
 			delay(1000);
 		}
-		else if ( (g_cfg.config.flags & F_ESP_USING) && IS_P(cmd+5,PSTR("adj"), 3)) {
+		else if ( (g_cfg.config.esp_en) && IS_P(cmd+5,PSTR("adj"), 3)) {
 			DateTime now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
 			print_now(output);
@@ -456,107 +503,25 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			if (IS_P(cmd + 8, PSTR("count"), 5)) {
 				uint8_t tmp;
 				char*ptr=cmd+8+6;
-// 				Serial1.print("str:");
-// 				Serial1.print(ptr);
-// 				Serial1.println("]");
 				set_field<uint8_t>(tmp, &ptr);
-// 				Serial1.print("pots count=");
-// 				Serial1.println(tmp, DEC);
 				g_cfg.config.pots_count = tmp;
 				g_cfg.writeGlobalConfig();
 				output->println(F("OK;"));
 				return true;
 			}
-         //pot set <index:0>,<dev:1>,<pin:2>,<x:3>,<y:4>,<name:5>,<airTime:6>,<state:7>,<enabled:8>,<ml:9>,<pgm:10>,<param1:11>[,param2][,param3]...,<daymax>;
-         //set pot 0,61,5,1,3,elephantorhiza,2,1,1,60,1,850;
-         //pot set 0,34,1,0,0,euc x1,2,0,1,30,1,700,500
 			uint8_t tmp, index;
 			char*ptr=cmd+8;
 			set_field<uint8_t>(index, &ptr);
-			potConfig pc = g_cfg.readPot(index);
-			set_field<uint8_t>(tmp, &ptr);
-			pc.sensor.dev = tmp;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.sensor.pin = tmp;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.x = tmp;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.y = tmp;
-			char*dst=pc.name;
-			while (*ptr && *ptr!=',') *dst++ = *ptr++;
-			*dst = 0;
-			++ptr;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.airTime = tmp & 0x03;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.state = tmp & 1;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.enabled = tmp & 1;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.ml = tmp;
-			set_field<uint8_t>(tmp, &ptr);
-			pc.wc.pgm = tmp;
-			output->print(F("pgm="));
-			output->println(pc.wc.pgm, DEC);
-			if (pc.wc.pgm == 1) {
-				set_field<uint16_t>(pc.pgm.const_hum.value, &ptr);
-				set_field<uint16_t>(pc.pgm.const_hum.max_ml, &ptr);
-				Serial1.print(pc.pgm.const_hum.value, DEC);
-				output->print(F(" daymax="));
-				output->println(pc.pgm.const_hum.max_ml, DEC);
-			} else if (pc.wc.pgm == 2) {
-				set_field<uint16_t>(pc.pgm.hum_and_dry.min_value, &ptr);
-				set_field<uint16_t>(pc.pgm.hum_and_dry.max_value, &ptr);
-				set_field<uint16_t>(pc.pgm.hum_and_dry.max_ml, &ptr);
-				output->print(pc.pgm.hum_and_dry.min_value, DEC);
-				output->print(F(".."));
-				output->print(pc.pgm.hum_and_dry.max_value, DEC);
-				output->print(F(" daymax="));
-				output->println(pc.pgm.hum_and_dry.max_ml, DEC);
-			}
-			g_cfg.savePot(index, pc);
-			output->println(F("OK;"));
-			/*
-typedef struct wateringConfig{
-	uint8_t	x:3;
-	uint8_t y:5;
-	uint8_t pgm_id:4;
-	uint8_t airTime:2;
-	uint8_t state:1;
-	uint8_t enabled:1;
- 	uint8_t flags;
-	uint8_t	ml;
-	uint16_t watered;
-}wateringConfig;//6 bytes*/
-			//pot set index,dev, pin,sensor_flags,noise, "name", x, y, airtime,en, flags, ml, pgm_id [, pgm params];
+			Wizard w;
+			w.edit_pot(index);
 		}
 		
 	} else if (IS_P(cmd, PSTR("cfg"), 3)) {
 		if (IS_P(cmd + 4, PSTR("get"), 3)) {
 			printGcfg(output);
 		} else if (IS_P(cmd + 4, PSTR("set"), 3)) {
-			//print_field<uint16_t>(gcfg.config.enabled);
 			Wizard w;
 			w.cfg_run();
-			/*char *ptr = cmd + 4 + 4;
-			uint16_t val = g_cfg.config.flags;
-			set_field<uint16_t>(val, &ptr);
-			g_cfg.config.flags = val;
-			g_cfg.config.enabled = val & 1;
-			set_field<uint8_t>(g_cfg.config.pots_count, &ptr);
-			set_field<uint16_t>(g_cfg.config.i2c_pwron_timeout, &ptr);
-			set_field<uint16_t>(g_cfg.config.sensor_init_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.sensor_read_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_start_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_end_time, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_start_time_we, &ptr);
-			set_field<uint16_t>(g_cfg.config.water_end_time_we, &ptr);
-			set_field<uint8_t>(g_cfg.config.sensor_measures, &ptr);
-			set_field<uint8_t>(g_cfg.config.test_interval, &ptr);	
-			g_cfg.writeGlobalConfig();
-// 			printGcfg();
-			g_cfg.readGlobalConfig();
-			printGcfg(output);*/
 		}
 	} else if (IS_P(cmd, PSTR("start"), 5)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
@@ -662,6 +627,10 @@ void setup()
 	
  	Wire.begin();
   	clock.begin();
+   	
+	g_cfg.begin();
+ 	g_cfg.readGlobalConfig();
+	
  	water_doser.begin();
 // 	water_doser.testAll();
 // #ifdef USE_LEDS
@@ -690,8 +659,9 @@ void setup()
 	leds.digitalWrite(LED_YELLOW, LOW);	
 #endif
 
+
  	esp8266.setPacketParser(processPacket);
-	if (g_cfg.config.flags & F_ESP_USING) {
+	if (g_cfg.config.esp_en) {
 		Serial1.println(F("Init ESP8266..."));
 		esp8266.begin(38400, ESP_RST_PIN);
 		esp8266.connect();
@@ -707,8 +677,6 @@ void setup()
 // 	digitalWrite(PLANT_LIGHT_PIN, LOW);
 #endif
 
-   	g_cfg.begin();
- 	g_cfg.readGlobalConfig();
 	wctl.init(&i2cExpander);
 
 
@@ -744,6 +712,7 @@ void setup()
 			Serial1.write(' ');
 			Serial1.print(addr[i], HEX);
 		}
+		Serial1.println();
 	}
      Serial1.println("No more addresses.");
 //     Serial1.println();
@@ -751,6 +720,7 @@ void setup()
 //     delay(250);
 	Serial1.println(F("setup() end"));
 }
+
 
 /**
 	TODO: программные кнопки включения насосов. с парковкой соотв. дозатора в первую занятую дырку(чтоб не лило мимо).
@@ -772,37 +742,11 @@ bool checkContinue()
 		leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
 		delay(1000);
 	}
-// 	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
+//  	leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
 #endif
 	return true;//g_cfg.config.enabled;
 }
 
-uint16_t last_temp_read = 0;
-
-float readTemp(uint8_t*addr)
-{
-	uint8_t data[9];
-	ds.reset();
-	ds.select(addr);
-	ds.write(0x44, 1);
-	delay(1000);
-	ds.reset();
-	ds.select(addr);    
-	ds.write(0xBE);
-	for (uint8_t i = 0; i < 9; i++) {           // we need 9 bytes
-		data[i] = ds.read();
-		Serial1.print(data[i], HEX);
-		Serial1.print(" ");
-	}
-	int16_t raw = (data[1] << 8) | data[0];
-	byte cfg = (data[4] & 0x60);
-	// at lower res, the low bits are undefined, so let's zero them
-	if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
-	else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-	else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-	//// default is 12 bit resolution, 750 ms conversion time
-	return (float)raw / 16.0;
-}
 
 void loop()
 {
@@ -824,47 +768,19 @@ void loop()
    	checkCommand();
 	delay(500);
 // 	return;
-	if (g_cfg.config.flags & F_ESP_USING) {
+	if (g_cfg.config.esp_en) {
 		esp8266.process();
 	}
 
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
 	if (now.minute()%5 == 0 && now_m!=last_temp_read) {
-		char udp[16], buf[24];
+		readDS18B20();
 		last_temp_read = now_m;
-		float celsius = readTemp(addr_out);
-		Serial1.print("temp outside:");
-		Serial1.println(celsius);
-		if (g_cfg.config.flags & F_ESP_USING) {
-			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
-			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
-				int len = sprintf(udp, "TO=%d\0", round(celsius*100)); 
-				sprintf(buf, "AT+CIPSEND=3,%d", len);
-	// 			Serial.print(udp);
-	// 			Serial.write(0);
-				esp8266.sendCmd(buf, true, ">", 4000);
-				esp8266.sendCmd(udp, true, "OK", 4000);
-			}
-		}
-		celsius = readTemp(addr_in);
-		Serial1.print("temp indoor:");
-		Serial1.println(celsius);
-		if (g_cfg.config.flags & F_ESP_USING) {
-			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
-			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",55455"), true, s_OK, 3000)) {
-				int len = sprintf(udp, "TI=%d\0", round(celsius*100)); 
-				sprintf(buf, "AT+CIPSEND=3,%d", len);
-	// 			Serial.print(udp);
-	// 			Serial.write(0);
-				esp8266.sendCmd(buf, true, ">", 4000);
-				esp8266.sendCmd(udp, true, "OK", 4000);
-			}
-		}
 	}
 	
 	if (now_m > 2400 || now.year() < 2016) {
-		if (g_cfg.config.flags & F_ESP_USING) {
+		if (g_cfg.config.esp_en) {
 			now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
 			print_now(&Serial1);
@@ -876,6 +792,7 @@ void loop()
 #ifdef MY_ROOM
 	if (now_m > 900 && now_m < 2100) {
 		leds.digitalWrite(LED_GREEN, _pulse_state);
+		leds.digitalWrite(LED_YELLOW, g_cfg.config.enabled);
 		pinMode(AQUARIUM_PIN, OUTPUT);
 		digitalWrite(AQUARIUM_PIN, HIGH);
 		if (millis()-last_light_en > 60000UL) {
@@ -942,7 +859,7 @@ void loop()
 // 		Serial1.println("g_cfg.midnight_tasks(); ended");
 // 		Serial1.flush();
 		midnight_skip = true;
-		if (g_cfg.config.flags & F_ESP_USING) {
+		if (g_cfg.config.esp_en) {
 			now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
 		}
@@ -952,69 +869,3 @@ void loop()
 // 	Serial1.println(freeMemory(), DEC);
 	delay(100);
 }
-/*
-cfg set 1,3,500,100,100,900,2100,1000,2100,3,30;
-
-0	0	euc x1
-0	1	баобаб
-0	2	euc 34/12
-0	3 	эвк. 35/14
-0	4	эвк. 34/14
-0	5	бао 34/5
-0	6	мушмула 34/4
-0	7	толстянка портулаковая 
-0	8	эвкалипт "8"
-1	0	длинный кактус(почти лысый)	34/6
-1	1	34/13
-1	2	34/15
-1	3	34/3
-1	4	34/10
-1	5	эвк. чёрный круглый горшок
-1	6	баобаб1
-1	7	алоэ
-1	8	альбиция(недофиолетовый)
-2	0	34/7
-2	1	ладанник
-2	2	свободен
-2	3	свободен -У
-2	4   свободен -У
-2	5	свободен -У
-2	6	свободен -У
-2	7	34/8
-2	8	34/9
-
-0,34,1,0,0,euc x1,1,0,1,20,1,890,500;
-1,34,0,0,1,baobab,1,0,0,10,2,0,650,300;
-2,34,12,0,2,euc 34/12,2,0,1,20,1,700,300;
-3,35,14,0,3,euc 35/14,2,0,1,30,1,865,500;
-4,34,14,0,4,euc 34/14,2,0,1,10,1,750,100;
-5,34,5,0,5,baobab 34/5,0,0,1,20,1,750,60;
-6,34,4,0,6,mushmula 34/4,1,0,1,10,1,520,60;
-7,35,8,0,7,tolstanka port,2,0,1,10,2,0,510,50;
-8,35,9,0,8,euc "8",0,0,1,40,1,720,200;
-9,34,6,1,0,cereus 34/6,2,0,1,10,2,500,580,30;
-10,34,13,1,1,maklura 34/13,1,0,1,10,1,630,30;
-11,34,15,1,2,euc.kust 34/15,1,0,1,20,1,920,600;
-12,34,3,1,3,euc. 34/3,2,0,1,20,1,700,600;
-13,34,10,1,4,euc 34/10,2,0,1,20,1,900,600;
-14,35,13,1,5,euc in black pot ,2,0,1,20,1,580,600;
-15,35,11,1,6,baobab 1,2,0,1,20,2,400,470,300;
-16,35,15,1,7,aloe,2,0,1,20,2,490,510,80;
-17,35,10,1,8,albicia,2,0,1,20,1,850,200;
-18,34,7,2,0,euc 34/7,2,0,1,20,1,780,500;
-19,34,11,2,1,ladannik,0,0,1,20,1,650,300;
-20,34,8,2,7,maklura 34/8,0,0,1,10,1,600,30;
-21,34,9,2,8,morkovka 34/9,0,0,1,10,1,630,200;
-
-1,22,500,0,0,800,2100,1000,2100,3,15;
-
-
-0,61,5,1,3,elephantorhiza,2,1,1,20,1,850,80;
-1,61,2,1,4,euc.degl 61/2,2,1,1,30,1,400,420;
-2,61,4,1,5,euc.degl 61/4,2,1,1,30,1,880,120;
-3,61,0,1,6,mango 0,2,1,1,40,1,880,200;
-4,61,7,1,7,mango 7,2,1,1,40,1,500,200;
-5,61,6,1,8,euc 61/6,2,1,1,40,1,700,300;
-6,61,3,2,0,mango 3,2,1,1,40,1,800,300;
-
-*/

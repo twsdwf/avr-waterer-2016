@@ -14,14 +14,14 @@ public:
 	void cfg_run();
 	void hello();
 	void exit(int pi);
-	
+	void edit_pot(uint8_t index);
 	int wd_pos_is_free(int x, int y);
 	int dev_pin_is_free(int dev, int pin);
 	
 	char ask_char(const __FlashStringHelper* promt, char*values);
 	int ask_int(const __FlashStringHelper* promt, int min, int max);
 	uint16_t ask_uint16(const __FlashStringHelper* promt, uint16_t min, uint16_t max, uint16_t& curval);
-	void ask_str(const __FlashStringHelper* promt, char*buf, int maxlen);
+	void ask_str(const __FlashStringHelper* promt, char*buf, int maxlen, bool buf_has_curval=false);
 	
 };
 

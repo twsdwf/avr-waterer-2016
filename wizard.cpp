@@ -4,11 +4,13 @@
 #include "i2cexpander.h"
 #include "waterdosersystem.h"
 #include "esp8266.h"
+#include "wateringcontroller.h"
 
 extern Configuration g_cfg;
 extern WaterDoserSystem water_doser;
 extern I2CExpander i2cExpander;
 extern ESP8266 esp8266;
+extern WateringController wctl;
 
 Wizard::Wizard()
 {
@@ -26,63 +28,80 @@ Wizard::~Wizard()
 void Wizard::cfg_run()
 {
 	Serial1.println(F("=== CONFIG WIZARD ==="));
-/*	uint16_t val = (uint16_t)g_cfg.config.enabled;
-// 	print_field<uint16_t>(val);
-	val = (uint16_t)g_cfg.config.flags;
-	print_field<uint16_t>(output, val);
-	print_field<uint8_t>(output, g_cfg.config.pots_count);
-	print_field<uint16_t>(output, g_cfg.config.i2c_pwron_timeout);
-	print_field<uint16_t>(output, g_cfg.config.sensor_init_time);
-	print_field<uint16_t>(output, g_cfg.config.sensor_read_time);
-	print_field<uint16_t>(output, g_cfg.config.water_start_time);
-	print_field<uint16_t>(output, g_cfg.config.water_end_time);
-	print_field<uint16_t>(output, g_cfg.config.water_start_time_we);
-	print_field<uint16_t>(output, g_cfg.config.water_end_time_we);
-	print_field<uint8_t>(output, g_cfg.config.sensor_measures);
-	print_field<uint8_t>(output, g_cfg.config.test_interval, ';');*/
 	uint16_t h,m;
-	ask_uint16(F("I2C power-on time, ms"), 0, 60000, g_cfg.config.i2c_pwron_timeout);
-	ask_uint16(F("Sensor pre-read time, ms"), 0, 60000, g_cfg.config.sensor_init_time);
-	ask_uint16(F("Sensor pause between read, ms"), 0, 60000, g_cfg.config.sensor_read_time);
-	h = g_cfg.config.sensor_measures;
-	g_cfg.config.sensor_measures = ask_uint16(F("Sensor measures"), 0, 20, h);
+	if ('Y' == ask_char(F("Change sensor options(Y/N)?"), "YN")) {
+		ask_uint16(F("I2C power-on time, ms"), 0, 60000, g_cfg.config.i2c_pwron_timeout);
+		ask_uint16(F("Sensor pre-read time, ms"), 0, 60000, g_cfg.config.sensor_init_time);
+		ask_uint16(F("Sensor pause between read, ms"), 0, 60000, g_cfg.config.sensor_read_time);
+		h = g_cfg.config.sensor_measures;
+		g_cfg.config.sensor_measures = ask_uint16(F("Sensor measures"), 0, 20, h);
+	}
 	
 	h = g_cfg.config.pots_count;
 	g_cfg.config.pots_count = ask_uint16(F("Pots count"), 0, 100, h);
-	
-	h=g_cfg.config.water_start_time/100, m=g_cfg.config.water_start_time%100;
-	ask_uint16(F("Monday-Friday watering start, hour"), 0, 24, h);
-	ask_uint16(F("Monday-Friday watering start, minute"), 0, 60, m);
-	g_cfg.config.water_start_time = h * 100 + m;
-	h = g_cfg.config.water_end_time/100;
-	m = g_cfg.config.water_end_time%100;
-	ask_uint16(F("Monday-Friday watering end, hour"), 0, 24, h);
-	ask_uint16(F("Monday-Friday watering end, minute"), 0, 60, m);
-	g_cfg.config.water_end_time = h * 100 + m;
+	if ('Y' == ask_char(F("Change watering time options(Y/N)?"), "YN")) {
+		h=g_cfg.config.water_start_time/100, m=g_cfg.config.water_start_time%100;
+		ask_uint16(F("Monday-Friday watering start, hour"), 0, 24, h);
+		ask_uint16(F("Monday-Friday watering start, minute"), 0, 60, m);
+		g_cfg.config.water_start_time = h * 100 + m;
+		h = g_cfg.config.water_end_time/100;
+		m = g_cfg.config.water_end_time%100;
+		ask_uint16(F("Monday-Friday watering end, hour"), 0, 24, h);
+		ask_uint16(F("Monday-Friday watering end, minute"), 0, 60, m);
+		g_cfg.config.water_end_time = h * 100 + m;
 
-	h = g_cfg.config.water_start_time_we / 100, m = g_cfg.config.water_start_time_we % 100;
-	ask_uint16(F("Weekend watering start, hour"), 0, 24, h);
-	ask_uint16(F("Weekend watering start, minute"), 0, 60, m);
-	g_cfg.config.water_start_time = h * 100 + m;
-	h = g_cfg.config.water_end_time_we / 100;
-	m = g_cfg.config.water_end_time_we % 100;
-	ask_uint16(F("Weekend watering end, hour"), 0, 24, h);
-	ask_uint16(F("Weekend watering end, minute"), 0, 60, m);
-	g_cfg.config.water_end_time_we = h * 100 + m;
-	
+		h = g_cfg.config.water_start_time_we / 100, m = g_cfg.config.water_start_time_we % 100;
+		ask_uint16(F("Weekend watering start, hour"), 0, 24, h);
+		ask_uint16(F("Weekend watering start, minute"), 0, 60, m);
+		g_cfg.config.water_start_time = h * 100 + m;
+		h = g_cfg.config.water_end_time_we / 100;
+		m = g_cfg.config.water_end_time_we % 100;
+		ask_uint16(F("Weekend watering end, hour"), 0, 24, h);
+		ask_uint16(F("Weekend watering end, minute"), 0, 60, m);
+		g_cfg.config.water_end_time_we = h * 100 + m;
+		
+	}
 	h = g_cfg.config.test_interval;
 	g_cfg.config.test_interval = ask_uint16(F("Test interval, minutes"), 0, 180, h);
 	
+	if ('Y' == ask_char(F("Change water doser Z-axe servo angles(Y/N)?"), "YN")) {
+		
+		h = g_cfg.config.wdz_ddc;
+		do {
+			ask_uint16(F("Z-axe down DC:"), 0, 180, h);
+			water_doser.servoMove(h);
+		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
+		g_cfg.config.wdz_ddc = h;
+
+		h = g_cfg.config.wdz_tdc;
+		do {
+			ask_uint16(F("Z-axe top DC:"), 0, 180, h);
+			water_doser.servoMove(g_cfg.config.wdz_ddc);
+			delay(500);
+			water_doser.servoMove(h);
+		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
+		g_cfg.config.wdz_tdc = h;
+		
+		h = g_cfg.config.wdz_top;
+		do {
+			ask_uint16(F("Z-axe top default pos:"), 0, 180, h);
+			water_doser.servoMove(g_cfg.config.wdz_tdc);
+			delay(500);
+			water_doser.servoMove(h);
+		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
+		g_cfg.config.wdz_top = h;
+	}
+	
 	g_cfg.config.enabled = (ask_char(F("Enable watering(Y/N)?"), "YN") == 'Y');
+	
 	h = (g_cfg.config.flags & F_ESP_USING)? 1 : 0;
+	
 	m = (ask_char(F("Use esp8266(Y/N)?"), "YN") == 'Y') ? 1 : 0;
 	if ( m > h ) {
 		esp8266.begin(38400, ESP_RST_PIN);
+		esp8266.connect();
 	}
-	g_cfg.config.flags &= ~F_ESP_USING;
-	if (m) {
-		g_cfg.config.flags |= F_ESP_USING;
-	}
+	g_cfg.config.esp_en = m;
 	
 	g_cfg.writeGlobalConfig();
 	Serial1.println(F("saved"));
@@ -96,7 +115,7 @@ char Wizard::ask_char(const __FlashStringHelper* promt, char*values)
 	Serial1.flush();
 	while (1) {
 		if (Serial1.available()) {
-			char ch = Serial1.read();
+			char ch = toupper(Serial1.read());
 			Serial1.write(ch);Serial1.flush();
 			char*ptr = values;
 			while (*ptr) {
@@ -121,13 +140,13 @@ uint16_t Wizard::ask_uint16(const __FlashStringHelper* promt, uint16_t min, uint
 	Serial1.print("(current value ");
 	Serial1.print(curval, DEC);
 	Serial1.print("): ");
-	Serial1.flush();
+// 	Serial1.flush();
 	uint16_t ret = 0, nch=0;
 	while (1) {
 		if (Serial1.available()) {
 			char ch = Serial1.read();
-			Serial1.write(ch);Serial1.flush();
-			if(isdigit(ch)) {
+			if (isdigit(ch)) {
+				Serial1.write(ch);
 				ret *= 10;
 				ret += (ch - '0');
 				++nch;
@@ -136,6 +155,7 @@ uint16_t Wizard::ask_uint16(const __FlashStringHelper* promt, uint16_t min, uint
 					if (nch) {
 						curval = ret;
 					} else {
+						Serial1.print(curval, DEC);
 						ret = curval;
 					}
 					Serial1.println();
@@ -177,7 +197,7 @@ int Wizard::ask_int(const __FlashStringHelper* promt, int min, int max)
 					Serial1.println(F("\r\nERROR: value is out of range"));
 					return ask_int(promt, min, max);
 				}
-			} else if (ch == 'X') {
+			} else if (toupper(ch) == 'X') {
 				Serial1.println();
 				return -1;
 			}
@@ -187,17 +207,23 @@ int Wizard::ask_int(const __FlashStringHelper* promt, int min, int max)
 	return -1;
 }
 	
-void Wizard::ask_str(const __FlashStringHelper* promt, char*buf, int maxlen)
+void Wizard::ask_str(const __FlashStringHelper* promt, char*buf, int maxlen,bool buf_has_curval)
 {
 	delay(500);
 	while(Serial1.available()) Serial1.read();
 	Serial1.print(promt);
-	Serial1.flush();
+	if (buf_has_curval) {
+		Serial1.print(F(" (current value:"));
+		Serial1.print(buf);
+		Serial1.println(F(")"));
+	}
+// 	Serial1.flush();
 	char*pb = buf;
 	while (1) {
 		if (Serial1.available()) {
 			char ch = Serial1.read();
-			Serial1.write(ch);Serial1.flush();
+			Serial1.write(ch);
+			Serial1.flush();
 			if (ch == 10 || ch == 13) {
 				Serial1.println();
 				return;
@@ -231,9 +257,9 @@ void Wizard::exit(int pi)
 int Wizard::wd_pos_is_free(int x, int y)
 {
 	
-	for(uint8_t i = 0; i < g_cfg.config.pots_count; ++i) {
+	for (uint8_t i = 0; i < g_cfg.config.pots_count; ++i) {
 		potConfig pc = g_cfg.readPot(i);
-		if(pc.wc.x == x && pc.wc.y == y) {
+		if (pc.wc.x == x && pc.wc.y == y) {
 			return i;
 		}
 	}//for i
@@ -244,7 +270,7 @@ int Wizard::dev_pin_is_free(int dev, int pin)
 {
 	for (uint8_t i = 0; i < g_cfg.config.pots_count; ++i) {
 		potConfig pc = g_cfg.readPot(i);
-		if(pc.sensor.dev == dev && pc.sensor.pin == pin) {
+		if (pc.sensor.dev == dev && pc.sensor.pin == pin) {
 			return i;
 		}
 	}//for i
@@ -259,8 +285,6 @@ void Wizard::__list_i2c()
 	i2cExpander.i2c_on();
 	
 	while (i2cExpander.findNext(addr, 32 + 7, &addr)) {
-// 		Serial1.print(addr,DEC);
-// 		Serial1.print(F(","));
 		b1 |= 1<<(addr - 32);
 		++addr;
 		++this->n_iic;
@@ -268,20 +292,11 @@ void Wizard::__list_i2c()
 	
 	addr = 56;
 	while (i2cExpander.findNext(addr, 56 + 7, &addr)) {
-// 		Serial1.print(addr,DEC);
-// 		Serial1.print(F(","));
 		b2 |= 1<<(addr - 56);
 		++addr;
 		++this->n_iic;
 	}
-/*	
-	Serial1.println();
-	Serial1.print("devs:");
-	Serial1.println(this->n_iic);
-	Serial1.print(b1, HEX);
-	Serial1.print(" ");
-	Serial1.println(b2, HEX);*/
-	
+
 	this->i2c_devs = new uint8_t[this->n_iic];
 	
 	uint8_t i = 0;
@@ -289,22 +304,93 @@ void Wizard::__list_i2c()
 	for (uint8_t j=0; j <8; ++j) {
 		if (b1 & (1<<j)) {
 			this->i2c_devs[i++] = 32 + j;
-// 			Serial1.print(32 + j);
-// 			Serial1.print(" ");
 		}
 	}//for j
 	
 	for (uint8_t j=0; j <8; ++j) {
 		if (b2 & (1<<j)) {
 			this->i2c_devs[i++] = 56 + j;
-// 			Serial1.print(56 + j);
-// 			Serial1.print(" ");
 		}
 	}//for j
-// 	Serial1.println();
 	i2cExpander.i2c_off();
 }
 
+void Wizard::edit_pot(uint8_t index)
+{
+	if (index >= g_cfg.config.pots_count) {
+		Serial1.println(F("Index out of bounds"));
+		return;
+	}
+	potConfig pc = g_cfg.readPot(index);
+	char reply;
+	uint16_t x, y;
+	
+	ask_str(F("plant name"), pc.name, POT_NAME_LENGTH - 1, true);
+	x = pc.wc.x;
+	y = pc.wc.y;
+	ask_uint16(F("water doser X pos"), 0, WD_SIZE_Y - 1, x);
+	pc.wc.x = x;
+	ask_uint16(F("water doser Y pos"), 0, WD_SIZE_Y - 1, y);
+	pc.wc.y = y;
+	x = pc.sensor.dev;
+	y = pc.sensor.pin;
+	ask_uint16(F("Chip address"), 32, 56+8, x);
+	ask_uint16(F("Pin index on chip"), 0, 15, y);
+	pc.sensor.dev = x;
+	pc.sensor.pin = y;
+	
+	int val = i2cExpander.read_pin(pc.sensor.dev, pc.sensor.pin);
+	
+	while (true) {
+		val = i2cExpander.read_pin(pc.sensor.dev, pc.sensor.pin);
+		Serial1.print(F("sensor value:"));
+		Serial1.println(val, DEC);
+		if (val < 10) {
+			reply = ask_char(F("Sensor value possibly bad. [R]e-read,[I]gnore and continue, e[X]it?"), "RIX");
+			if (reply == 'X') {
+				this->exit(index);
+				return;
+			} else if (reply == 'I') {
+				break;
+			}
+		} else {
+			break;
+		}
+	}//while
+
+	x = pc.wc.airTime;
+	ask_uint16(F("Air time(1-short, 2-medium, 3-long)"), 1, 3, x);
+	pc.wc.airTime = x;
+	pc.wc.enabled = ask_char(F("Enable watering(Y/N)"), "YN") == 'Y';
+	x = pc.wc.ml;
+	ask_uint16(F("Portion, ml(5..100):"), 5, 100, x);
+	pc.wc.ml = x;
+
+	x = pc.wc.pgm;
+	ask_uint16(F("Watering program (1 - const humidity, 2 - interval humidity)"), 1, 2, x);
+	pc.wc.pgm = x;
+	if (pc.wc.pgm  == 1) {
+		x = pc.pgm.const_hum.value;
+		pc.pgm.const_hum.value = ask_uint16(F("barrier value:"), 10, 1023, x);
+		x = pc.pgm.const_hum.max_ml;
+		pc.pgm.const_hum.max_ml = ask_uint16(F("daymax, ml:"), 1, 1023, x);
+	} else if (pc.wc.pgm == 2) {
+		x = pc.pgm.hum_and_dry.min_value;
+		pc.pgm.hum_and_dry.min_value = ask_uint16(F("Dry barrier value:"), 10, 1023, x);
+		x =pc.pgm.hum_and_dry.max_value;
+		pc.pgm.hum_and_dry.max_value = ask_uint16(F("Water barrier value:"), pc.pgm.hum_and_dry.min_value + 5, 1023, x);
+		x = pc.pgm.hum_and_dry.max_ml;
+		pc.pgm.hum_and_dry.max_ml = ask_uint16(F("daymax, ml:"), 1, 1023, x);
+	}
+	
+	if (ask_char(F("Write pot config?"), "YN") == 'Y') {
+		g_cfg.savePot(index, pc);
+	}
+	if (ask_char(F("Clear day stat for plant?"), "YN") == 'Y') {
+		wctl.writeDayML(index, 0);
+	}
+	
+}
 
 void Wizard::run(uint8_t show_hello)
 {
@@ -349,10 +435,34 @@ void Wizard::run(uint8_t show_hello)
 				this->exit(pi);
 				return;
 			} else {
-				_pc = g_cfg.readPot(pi);
+				this->edit_pot(pi);
+				this->exit(pi);
+				return;
 			}
 		}
 	}
+	if ('Y' == ask_char(F("Show all free water doser positions(Y/N)?"), "YN")) {
+		uint16_t busy[WD_SIZE_X]={0};
+		for (uint8_t i = 0; i < g_cfg.config.pots_count; ++i) {
+			potConfig pc = g_cfg.readPot(i);
+			busy[pc.wc.x] |= (1 << pc.wc.y);
+		}
+		for (uint8_t i =0; i< WD_SIZE_X; ++i) {
+			if (busy[i] == 0) {
+				continue;
+			}
+			Serial1.print(F("x="));
+			Serial1.print(i);
+			Serial1.print(" y:");
+			for (uint8_t j = 0; j < WD_SIZE_Y; ++j) {
+				if (0 == (busy[i] & (1<<j))) {
+					Serial1.print(j, DEC);
+					Serial1.print(",");
+				}
+			}//for j
+			Serial1.println();
+		}//for i
+	}//if show all wd pos
 	
 	int x = ask_int(F("Start X from:"), 0, WD_SIZE_X - 1);
 	if (x < 0) {
@@ -492,7 +602,7 @@ void Wizard::run(uint8_t show_hello)
 			}
 		}//while
 		
-		_pc.wc.ml = ask_int(F("Dose, ml(5..100):"), 5, 100);
+		_pc.wc.ml = ask_int(F("Portion, ml(5..100):"), 5, 100);
 		if (_pc.wc.ml < 5) {
 			this->exit(pi);
 			return;

@@ -129,58 +129,6 @@ typedef struct potConfig{
 	char name[POT_NAME_LENGTH];		//32-23-1
 }potConfig;
 
-
-// inline int wcfg_get_program(wateringConfig &wc)
-// {
-// 		return (wc.flags >> 4) & 0x0F;
-// }
-/*
-inline void wcfg_set_program(wateringConfig& wc, uint8_t program)
-{
-	wc.flags = (wc.flags &0x0F) | ((program & 0x0F) << 4);
-}*/
-// inline int wcfg_get_program(potConfig &pc)
-// {
-// 		return wcfg_get_program(pc.wc);
-// }
-//
-// inline void wcfg_set_program(potConfig& pc, uint8_t program)
-// {
-// 	wcfg_set_program(pc.wc, program);
-// }
-
-// inline bool is_pot_state_watering(potConfig& pc) {
-// 	return (pc.wc.flags & WCFG_STATE_WATERING) > 0;
-// }
-//
-// inline bool is_pot_watering_en(potConfig& pc)
-// {
-// 	return (pc.wc.flags & WCF_EN) > 0;
-// }
-//
-// inline void set_pot_watering_en(potConfig& pc, bool value)
-// {
-// 	if (value) {
-// 		pc.wc.flags |= WCF_EN;
-// 	} else {
-// 		pc.wc.flags &= ~WCF_EN;
-// 	}
-// }
-//
-//
-// inline bool is_pot_drying(potConfig& pc)
-// {
-// 	return (pc.wc.flags & WCFG_STATE_DRYING);
-// }
-//
-// inline void set_pot_watering(potConfig& pot, bool value)
-// {
-// 	if (value) {
-// 		pot.wc.flags &= ~WCFG_STATE_DRYING;
-// 	} else {
-// 		pot.wc.flags |= WCFG_STATE_DRYING;
-// 	}
-// }
 inline int IS_P(char*cmd, const char*pgm_str, uint8_t n)
 {
 	return 0==strncmp_P(cmd, pgm_str, n);
@@ -226,7 +174,8 @@ typedef struct WaterDoserSystemConfig{
 
 typedef struct globalConfig{
 	uint16_t enabled:1;
-	uint16_t flags:15;
+	uint16_t esp_en:1;
+	uint16_t flags:14;
 // 	uint8_t i2c_expanders_count;
 	uint8_t pots_count;
 // 	uint8_t dosers_count;
@@ -240,6 +189,10 @@ typedef struct globalConfig{
 	uint8_t sensor_measures;
 	uint8_t test_interval;
  	uint16_t lux_barrier_value;
+	/*water doser Z-axe servo angles (top default, top dead center, down dead center*/
+	uint8_t wdz_top;
+	uint8_t wdz_tdc;
+	uint8_t wdz_ddc;
 }globalConfig;//21 bytes
 
 extern HardwareSerial Serial1;

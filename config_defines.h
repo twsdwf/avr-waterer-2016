@@ -91,17 +91,17 @@ PAGE		content
 #define VBTN_WEN		3
 
 #ifdef MY_ROOM
-	#define Z_DOWN_POS_STD		85
-	#define Z_TOP_POS			180
+// 	#define Z_DOWN_POS_STD		85
+// 	#define Z_TOP_POS			180
 	#define Z_AXE_AIN_MIN		100
 	#define Z_AXE_AIN_MAX		447
 	#define Z_AXE_ANGLE_MIN		10
 	#define Z_AXE_ANGLE_MAX		180
 #else
-	#define Z_DOWN_POS_STD	50
-	#define Z_TOP_POS		180
+// 	#define Z_DOWN_POS_STD	50
+// 	#define Z_TOP_POS		180
 #endif
-#define Z_DOWN_POS_EXT	100
-#define Z_DOWN_POS_MAX	100
+// #define Z_DOWN_POS_EXT	100
+// #define Z_DOWN_POS_MAX	100
 
 #endif

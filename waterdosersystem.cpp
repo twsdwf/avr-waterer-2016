@@ -263,15 +263,15 @@ int WaterDoserSystem::getCurPos()
 void WaterDoserSystem::servoMove(uint8_t new_pos)
 {
 	int cur_pos = getCurPos();
-// 	Serial1.print("Z:");
-// 	Serial1.print(cur_pos, DEC);
-// 	Serial1.print("=>");
-// 	Serial1.println(new_pos, DEC);
+	Serial1.print("Z:");
+	Serial1.print(cur_pos, DEC);
+	Serial1.print("=>");
+	Serial1.println(new_pos, DEC);
 	
 // 	if (abs(cur_pos - new_pos) < 2) {
 // 		return;
 // 	}
-	int dp = (new_pos >= cur_pos ? 1 : -1);
+// 	int dp = (new_pos >= cur_pos ? 1 : -1);
 	z_axe.attach(Z_AXE_SERVO_PIN);
 	z_axe.write(new_pos);
 	delay(500);
@@ -386,13 +386,13 @@ void WaterDoserSystem::servoUp()
 	errcode = 0;
 	uint32_t start = millis();
 	if (!Z_AT_TOP()) {
-		servoMove(Z_TOP_POS);
+		servoMove(g_cfg.config.wdz_tdc);
 		delay(1000);
 	}
 	
 	if (!Z_AT_TOP()) {
-		servoMove(Z_DOWN_POS_STD);
-		servoMove(Z_TOP_POS);
+		servoMove(g_cfg.config.wdz_ddc);
+		servoMove(g_cfg.config.wdz_tdc);
 		delay(2000);
 		if(!Z_AT_TOP()) {
 			delay(3000);
@@ -403,15 +403,17 @@ void WaterDoserSystem::servoUp()
 			errcode = WDERR_STICKED;
 		}
 	}
-	z_axe.write(140);
-	z_axe.detach();
+	servoMove(g_cfg.config.wdz_top);
+// 	delay(300);
+// 	z_axe.detach();
 }
 
 bool WaterDoserSystem::servoDown()
 {
-	servoMove(Z_DOWN_POS_STD);
+	servoMove(g_cfg.config.wdz_ddc);
 	if (Z_AT_TOP()) {
-		servoMove(Z_DOWN_POS_EXT);
+		servoMove(g_cfg.config.wdz_tdc);
+		servoMove(g_cfg.config.wdz_ddc);
 	}
 	return !Z_AT_TOP();
 }
