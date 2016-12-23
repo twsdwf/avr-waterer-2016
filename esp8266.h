@@ -27,6 +27,7 @@ protected:
 public:
 	bool sendCmd_P(PGM_P cmd, bool wait_reply=false, PGM_P reply_ok=NULL, uint32_t timeout=4000);
 	bool sendCmd(char*cmd, bool wait_reply=false, char*reply_ok=NULL, uint32_t timeout=4000, bool dbg=false);
+	bool sendZeroChar(char*reply_ok, uint32_t timeout=4000);
 	ESP8266(HardwareSerial*_com);
 	~ESP8266();
 	void begin(uint32_t baud,uint8_t _rst);

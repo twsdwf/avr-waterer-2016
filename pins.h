@@ -30,8 +30,8 @@
 #define X_STEP_PIN			(31)
 #define Y_STEP_PIN			(30)
 
-#define Z_AXE_DIR			(35)
-#define Z_AXE_EN			(36)
+// #define Z_AXE_DIR			(35) free
+// #define Z_AXE_EN			(36) free
 
 
 #define VCC_PUMP_EN			34
@@ -51,6 +51,7 @@
 	#define Z_SERVO_FEEDBACK_PIN	(A0)
 	#define XY_VCC_DELTA		5
 	#define Z_AXE_UP_PIN		A6
+	#define Z_AXE_DOWN_PIN		35 //digital
 #else
 	#define Z_AXE_UP_PIN	 	51
 #endif

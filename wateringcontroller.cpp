@@ -561,14 +561,26 @@ void WateringController::cleanDayStat()
 
 void WateringController::printDayStat(HardwareSerial* output)
 {
+	int day_total=0, ml;
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		potConfig pot = g_cfg.readPot(i);
 		output->print(i, DEC);
-		output->print(F(","));
+		output->print(F(" "));
 		output->print(pot.name);
+		output->print(F(" ("));
+		output->print(pot.sensor.dev, DEC);
 		output->print(F(","));
-		output->print(readDayML(i), DEC);
+		output->print(pot.sensor.pin, DEC);
+		output->print(F(") ["));
+		output->print(pot.wc.x, DEC);
 		output->print(F(","));
+		output->print(pot.wc.y, DEC);
+		output->print(F("] "));
+
+		ml = readDayML(i);
+		day_total += ml;
+		output->print(ml, DEC);
+		output->print(F(" of "));
 		if (pot.wc.pgm == 1) {
 			output->print(pot.pgm.const_hum.max_ml, DEC);
 		} else if (pot.wc.pgm == 2) {
@@ -576,4 +588,7 @@ void WateringController::printDayStat(HardwareSerial* output)
 		}
 		output->println(F(";"));
 	}
+	output->print(F("day usage:"));
+	output->print(day_total, DEC);
+	output->println(F("ml"));
 }

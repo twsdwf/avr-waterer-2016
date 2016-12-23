@@ -99,7 +99,7 @@ bool ESP8266::sendCmd_P(PGM_P cmd, bool wait_reply, PGM_P reply_ok, uint32_t tim
 		old_bi = bi;
 	}
 //  	Serial1.print((__FlashStringHelper*)cmd);
-//  	Serial1.println(F(" command timeout"));
+ 	Serial1.println(F(" command timeout"));
 	return false;
 }
 
@@ -149,6 +149,35 @@ void ESP8266::process()
     }//while avail
 
 }
+
+bool ESP8266::sendZeroChar(char*reply_ok, uint32_t timeout)
+{
+	com->write(0);
+	int16_t bi =  0;
+	int old_bi = -1;
+	uint32_t start = millis();
+	com->write(0);
+	com->print("\\0+++\0");
+	com->println();
+	com->flush();
+	while (millis() - start < timeout) {
+		while (com->available() > 0 ) {
+			esp_buf[ bi ] = com->read();
+			if (esp_buf[bi] >= ' ' || esp_buf[bi] == 10) {
+				bi = (bi + 1) % ESP_BUF_SIZE;
+			}
+		}
+		esp_buf[ bi ] = 0;
+		char *ptr = strstr(esp_buf, reply_ok);
+		if (ptr != NULL) {
+// 				last_ping = millis();
+			Serial1.println(F("send zero ok"));
+			return true;
+		}
+	}//while time
+	Serial1.println(F("send zero fault"));
+	return false;
+}//sub
 
 bool ESP8266::sendCmd(char*cmd, bool wait_reply, char*reply_ok, uint32_t timeout, bool dbg)
 {
@@ -265,14 +294,14 @@ int8_t ESP8266::reset()
 bool ESP8266::connect(uint32_t timeout)
 {
 	do {
-		bool ok = sendCmd_P(PSTR("AT"), true, s_OK, 4000);
+		bool ok = sendCmd_P(PSTR("AT"), true, s_OK, 20000);
 		int ret = 1;
 		if (!ok) {
 			do {
 				ret = this->reset();
 			} while(ret == 0);
 		}
-		ok = sendCmd_P(PSTR("AT"), true, s_OK, 4000);
+		ok = sendCmd_P(PSTR("AT"), true, s_OK, 20000);
 		if (ok) {
  			Serial1.println(F("AT is OK"));
 		}
@@ -343,7 +372,8 @@ DateTime ESP8266::getTimeFromNTPServer()
 	char buff[20];
 
 	sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
-	sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"129.6.15.28\",123"), true, s_OK, 3000) &&
+// 	sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"129.6.15.28\",123"), true, s_OK, 3000) &&
+	sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",123"), true, s_OK, 3000) &&
 	sprintf(buff, "AT+CIPSEND=3,%d", NTP_PACKET_SIZE);
 	if (sendCmd(buff, true, ">", 1000)) {
 		for (uint8_t i=0; i< NTP_PACKET_SIZE; ++i) {

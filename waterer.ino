@@ -371,10 +371,10 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		 water_doser.servoDown();
 		} else if(cmd[1] == 'M') {
 			pos -= 10;
-			water_doser.servoMove(pos);
+// 			water_doser.servoMove(pos);
 		} else if(cmd[1] == 'R') {
 			pos = 180;
-			water_doser.servoMove(pos);
+// 			water_doser.servoMove(pos);
 		}
 	} else if ('G'==cmd[0]) {
 		char *ptr = cmd + 1;
@@ -441,7 +441,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		output->println(F(";"));
 	} else if (IS_P(cmd, PSTR("time"), 4)) {
 		if (IS_P(cmd+5, PSTR("get"), 3)) {
-		} else if (IS_P(cmd+5, PSTR("set"), 3)) {
+		} /*else if (IS_P(cmd+5, PSTR("set"), 3)) {
 			//time set dd:dd:dd dd.d.dddd d
 			int dow, d, m, y, h, mi, s;
 			sscanf(cmd + 9, time_read_fmt,  &h, &mi, &s, &d, &m, &y, &dow);
@@ -450,7 +450,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			DateTime td(y, m, d, h, mi, s, dow);
 			clock.adjust(td);
 			delay(1000);
-		}
+		}*/
 		else if ( (g_cfg.config.esp_en) && IS_P(cmd+5,PSTR("adj"), 3)) {
 			DateTime now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
@@ -618,20 +618,27 @@ void processPacket(char*cmd)
 		}
 }
 
-
 void setup()
 {
 	wdt_disable();
 	Serial1.begin(BT_BAUD);
  	Serial1.println(F("HELLO;"));
 	
+// 	pinMode(Z_AXE_DOWN_PIN, INPUT);
+// 	while(1) {
+// 		Serial1.println(digitalRead(Z_AXE_DOWN_PIN), DEC);
+// 		delay(250);
+// 	}
+// 	return;
+	
  	Wire.begin();
   	clock.begin();
-   	
+
 	g_cfg.begin();
  	g_cfg.readGlobalConfig();
 	
- 	water_doser.begin();
+//  	water_doser.begin(); !DBG
+	
 // 	water_doser.testAll();
 // #ifdef USE_LEDS
 #if 1
@@ -666,7 +673,8 @@ void setup()
 		esp8266.begin(38400, ESP_RST_PIN);
 		esp8266.connect();
 		Serial1.println(F("Init ESP8266...[done]"));
-	}
+	}//if esp en
+	
 // 	Wire.begin();
 //  	clock.begin();
 	//leds.writeGPIOAB(0xFFFF);
@@ -747,6 +755,27 @@ bool checkContinue()
 	return true;//g_cfg.config.enabled;
 }
 
+void sendDailyReport()
+{
+	esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 8000);
+	delay(4000);
+	if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=4,\"TCP\",\"192.168.42.1\",15566"), true, s_OK, 10000)) {
+		if (esp8266.sendCmd_P(PSTR("AT+CIPSENDEX=4,2000\r\n"), true, gt, 10000)) {
+			Serial.println("Daily watering statictic");
+			wctl.printDayStat(&Serial);
+// 				Serial.write(0);
+			esp8266.sendZeroChar("SEND OK", 10000);
+// 					delay(2000);
+		} else {
+			Serial1.println(F("Send not inited=("));
+		}
+	} else {
+			Serial1.println(F("mail: CNX FAULT"));
+	}
+// 			delay(2000);
+	esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 3000);
+
+}
 
 void loop()
 {
@@ -766,7 +795,7 @@ void loop()
 #endif
 	_pulse_state = 1 - _pulse_state;
    	checkCommand();
-	delay(500);
+	delay(1000);
 // 	return;
 	if (g_cfg.config.esp_en) {
 		esp8266.process();
@@ -774,7 +803,7 @@ void loop()
 
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
-	if (now.minute()%5 == 0 && now_m!=last_temp_read) {
+	if (now.minute() % 5 == 0 && now_m!=last_temp_read) {
 		readDS18B20();
 		last_temp_read = now_m;
 	}
@@ -848,24 +877,21 @@ void loop()
 		clock.writeRAMbyte(LAST_CHECK_TS_2, 0);
 		clock.writeRAMbyte(LAST_CHECK_TS_3, 0);
 		clock.writeRAMbyte(LAST_CHECK_TS_4, 0);
-// 		Serial1.println("wctl.midnightTasks()");
-// 		Serial1.flush();
-// 		wctl.midnightTasks();
-// 		Serial1.println("wctl.midnightTasks() ended");
 		Serial1.flush();
-		wctl.cleanDayStat();
-		wctl.setStatDay(now.day());
 
-// 		Serial1.println("g_cfg.midnight_tasks(); ended");
-// 		Serial1.flush();
 		midnight_skip = true;
 		if (g_cfg.config.esp_en) {
 			now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
+			sendDailyReport();
 		}
+		
+		wctl.cleanDayStat();
+		wctl.setStatDay(now.day());
+
 	}
 // 		- last_check_time > g_cfg.config.
 //  	Serial1.println("ping");
 // 	Serial1.println(freeMemory(), DEC);
-	delay(100);
+	delay(1000);
 }

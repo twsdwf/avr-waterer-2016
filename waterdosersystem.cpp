@@ -9,6 +9,7 @@
 #include "waterdosersystem.h"
  #include "pins.h"
 #include "waterstorage.h"
+#include "esp8266.h"
 
 #define WFSM_NONE			(0)
 #define WFSM_WATERCOUNTER 	(1)
@@ -21,13 +22,15 @@
 #define WDERR_WFS_DEAD		2
 #define WDERR_POS_ERR		3
 
+extern ESP8266 esp8266;
+
 #ifdef MY_ROOM
 	#define X_AT_SLOT (digitalRead(X_STEP_PIN) == HIGH)
 	#define Y_AT_SLOT (digitalRead(Y_STEP_PIN) == HIGH)
 	#define X_AT_BEGIN (HIGH == digitalRead(X_BEGIN_PIN))
 	#define Y_AT_BEGIN (LOW == digitalRead(Y_BEGIN_PIN))
-// 	#define Z_AT_TOP		(analogRead(Z_AXE_UP_PIN) > 100 || analogRead(Z_AXE_UP_PIN) > 100 || analogRead(Z_AXE_UP_PIN) > 100)
-bool Z_AT_TOP()
+// 	#define Z_AT_TDC		(analogRead(Z_AXE_UP_PIN) > 100 || analogRead(Z_AXE_UP_PIN) > 100 || analogRead(Z_AXE_UP_PIN) > 100)
+bool Z_AT_TDC()
 {
 	int val = analogRead(6);
 	pinMode(Z_AXE_UP_PIN, INPUT);
@@ -36,12 +39,18 @@ bool Z_AT_TOP()
 	return val > 100;
 }
 
+bool Z_AT_DDC()
+{
+	int val = digitalRead(Z_AXE_DOWN_PIN);
+	return !val;
+}
+
 #else
 	#define X_AT_SLOT (digitalRead(X_STEP_PIN) == LOW)
 	#define Y_AT_SLOT (digitalRead(Y_STEP_PIN) == LOW)
 	#define X_AT_BEGIN (LOW == digitalRead(X_BEGIN_PIN))
 	#define Y_AT_BEGIN (HIGH == digitalRead(Y_BEGIN_PIN))
-	#define Z_AT_TOP()	(LOW == digitalRead(Z_AXE_UP_PIN))
+	#define Z_AT_TDC()	(LOW == digitalRead(Z_AXE_UP_PIN))
 #endif
 
 #define WDST_STOP		0
@@ -137,14 +146,17 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	digitalWrite(X_AXE_EN, LOW);
 	digitalWrite(Y_AXE_DIR, LOW);
 	digitalWrite(Y_AXE_DIR2, LOW);
-	digitalWrite(Y_AXE_EN, LOW);
+// 	digitalWrite(Y_AXE_EN, LOW);
 	
-	pinMode(Z_AXE_UP_PIN, INPUT);
+// 	pinMode(Z_AXE_UP_PIN, INPUT);
+	
+	pinMode(Z_AXE_DOWN_PIN, INPUT);
+
 	cur_x = 0xFF;
 	cur_y = 0xFF;
-	pinMode(Z_AXE_DIR, OUTPUT);
-	pinMode(Z_AXE_EN, OUTPUT);
-	z_pos = 180;
+// 	pinMode(Z_AXE_DIR, OUTPUT);
+// 	pinMode(Z_AXE_EN, OUTPUT);
+	z_pos = g_cfg.config.wdz_top;
    	servoUp();
 	park();
 	moveToPos(0, 0);
@@ -260,162 +272,93 @@ int WaterDoserSystem::getCurPos()
 // 	return constrain(val, Z_AXE_ANGLE_MIN, Z_AXE_ANGLE_MAX);
 }
 
-void WaterDoserSystem::servoMove(uint8_t new_pos)
+void WaterDoserSystem::servoMove(uint8_t new_pos, bool (*test_ok)())
 {
 	int cur_pos = getCurPos();
 	Serial1.print("Z:");
 	Serial1.print(cur_pos, DEC);
 	Serial1.print("=>");
 	Serial1.println(new_pos, DEC);
-	
+	/*
+		60 градусов за 0.1с
+		1 градус за Хс
+		Х = 0.1/60 ~ 0.002с 
+	 */
 // 	if (abs(cur_pos - new_pos) < 2) {
 // 		return;
 // 	}
-// 	int dp = (new_pos >= cur_pos ? 1 : -1);
+	int dp = (new_pos >= cur_pos ? 2 : -2);
 	z_axe.attach(Z_AXE_SERVO_PIN);
-	z_axe.write(new_pos);
-	delay(500);
-	/*while ( abs(cur_pos - new_pos) >= 2) {
+// 	z_axe.write(new_pos);
+// 	delay(1000);
+	while ( abs(cur_pos - new_pos) > 1 && !test_ok()) {
 		cur_pos += dp;
 		z_pos = cur_pos;
 		z_axe.write(cur_pos);
-		delay(40);
-	}*/
+		Serial1.print(cur_pos);
+		Serial1.print(" ");
+		delay(50);
+	}
+	Serial1.print(F("positioning status: "));
+	Serial1.println(test_ok(), DEC);
+	delay(300);
 	z_axe.detach();
 }
-/*
-void WaterDoserSystem::servoUp()
-{
-	errcode = 0;
-	pinMode(VCC_PUMP_EN, OUTPUT);
-	digitalWrite(VCC_PUMP_EN, HIGH);
-	pinMode(6, INPUT);
-	pinMode(Z_AXE_DIR, OUTPUT);
-	pinMode(Z_AXE_EN, OUTPUT);
-	digitalWrite(Z_AXE_EN, HIGH);
-	digitalWrite(Z_AXE_DIR, LOW);//UP
-	uint32_t start = millis();
- #ifdef MY_ROOM
-	while (analogRead(6) < 200 && (millis() - start < 10000UL))
- #else
-// 	Serial1.println(analogRead(6), DEC);
-	while (digitalRead(Z_AXE_UP_PIN) && (millis() - start < 10000UL))
- #endif
-	{
-		pinMode(VCC_PUMP_EN, OUTPUT);
-		digitalWrite(VCC_PUMP_EN, HIGH);
-//   		Serial1.println(analogRead(6), DEC);
-	}
- #ifdef MY_ROOM
-	if (analogRead(6) < 200)
- #else
-	if (digitalRead(Z_AXE_UP_PIN))
- #endif
-	{
-		Serial1.println(F("ERROR: sticked!"));
-		errcode = WDERR_STICKED;
-	} else {
-// 		Serial1.println(F("Z-axe is OK"));
-	}
 
-	digitalWrite(Z_AXE_DIR, LOW);
-	digitalWrite(Z_AXE_EN, LOW);
-	
-	digitalWrite(VCC_PUMP_EN, LOW);
-}
 
-bool WaterDoserSystem::servoDown()
-{
-	pinMode(Z_AXE_UP_PIN, INPUT);
-	pinMode(VCC_PUMP_EN, OUTPUT);
-	digitalWrite(VCC_PUMP_EN, HIGH);
-	delay(100);
-	pinMode(Z_AXE_DIR, OUTPUT);
-	pinMode(Z_AXE_EN, OUTPUT);
-	digitalWrite(Z_AXE_EN, HIGH);
-	digitalWrite(Z_AXE_DIR, HIGH);
-	uint32_t start  = millis();
- #ifdef MY_ROOM
-	while (analogRead(6) > 100 && millis() - start < 1000);
-#else
-//  	Serial1.println(digitalRead(Z_AXE_UP_PIN), DEC);
-	while (!digitalRead(Z_AXE_UP_PIN) && millis() - start < 1000) {
-//    		Serial1.println(digitalRead(Z_AXE_UP_PIN), DEC);
-		delay(300);
-	}
-#endif
-// 	return false;
-	//anti-stick system.would be great to add down-pos sensor optocoupler, but I'm so lazy...
-	int repeats = 0;
-#ifdef MY_ROOM
-	while (analogRead(6) > 100) {
-#else
-		//BIGROOM_STOPVAL and above -- up pos, less than BIGROOM_STOPVAL -- down pos
-	while (!digitalRead(Z_AXE_UP_PIN)) {
-#endif
-#ifndef MY_ROOM
-// 		Serial1.print("reed:");
-// 		Serial1.println(digitalRead(6), DEC);
-// 		Serial1.print('/');
-// 		Serial1.println(BIGROOM_STOPVAL, DEC);
-#endif
-		pinMode(VCC_PUMP_EN, OUTPUT);
-		digitalWrite(VCC_PUMP_EN, HIGH);
-
-		digitalWrite(Z_AXE_EN, HIGH);
-		digitalWrite(Z_AXE_DIR, LOW);
-		delay(2000);
-		digitalWrite(Z_AXE_EN, HIGH);
-		digitalWrite(Z_AXE_DIR, HIGH);
-		delay(2000);
-		++repeats;
-		if (repeats > 5) {
-			Serial1.println("sticked");
-			errcode = WDERR_STICKED;
-			return false;
-		}
-	}
-	delay(500);
-	return true;
-// 	digitalWrite(Z_AXE_EN, LOW);
-}
-
-*/
 void WaterDoserSystem::servoUp()
 {
 	errcode = 0;
 	uint32_t start = millis();
-	if (!Z_AT_TOP()) {
-		servoMove(g_cfg.config.wdz_tdc);
+	if (!Z_AT_TDC()) {
+		servoMove(g_cfg.config.wdz_tdc, Z_AT_TDC);
 		delay(1000);
 	}
 	
-	if (!Z_AT_TOP()) {
-		servoMove(g_cfg.config.wdz_ddc);
-		servoMove(g_cfg.config.wdz_tdc);
+	if (!Z_AT_TDC()) {
+		servoMove(g_cfg.config.wdz_ddc, Z_AT_DDC);
+		servoMove(g_cfg.config.wdz_tdc, Z_AT_TDC);
 		delay(2000);
-		if(!Z_AT_TOP()) {
+		if(!Z_AT_TDC()) {
 			delay(3000);
 		}
 		
-		if (!Z_AT_TOP()) {
+		if (!Z_AT_TDC()) {
 			Serial1.println(F("ERROR: sticked!"));
 			errcode = WDERR_STICKED;
+			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 8000);
+			delay(4000);
+			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=4,\"TCP\",\"192.168.42.1\",15566"), true, s_OK, 10000)) {
+				if (esp8266.sendCmd_P(PSTR("AT+CIPSENDEX=4,2000\r\n"), true, gt, 10000)) {
+					Serial.println("ERROR: Z-axe sticked!");
+					Serial.println("Z-axe sticked while moving to top pos=(");
+		// 				Serial.write(0);
+					esp8266.sendZeroChar("SEND OK", 10000);
+		// 					delay(2000);
+				} /*else {
+					Serial1.println(F("Send not inited=("));
+				}*/
+			} /*else {
+					Serial1.println(F("mail: CNX FAULT"));
+			}*/
+			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 3000);
 		}
 	}
-	servoMove(g_cfg.config.wdz_top);
+// 	servoMove(g_cfg.config.wdz_top, Z_AT_TDC);
 // 	delay(300);
 // 	z_axe.detach();
 }
 
 bool WaterDoserSystem::servoDown()
 {
-	servoMove(g_cfg.config.wdz_ddc);
-	if (Z_AT_TOP()) {
-		servoMove(g_cfg.config.wdz_tdc);
-		servoMove(g_cfg.config.wdz_ddc);
+// 	servoMove(g_cfg.config.wdz_ddc);
+	
+	
+	if (!Z_AT_DDC()) {
+// 		servoMove(g_cfg.config.wdz_tdc, Z_AT_TDC);
+		servoMove(g_cfg.config.wdz_ddc, Z_AT_DDC);
 	}
-	return !Z_AT_TOP();
+	return !Z_AT_TDC();
 }
 
 
@@ -495,16 +438,35 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 // Serial1.println("end of measure");
  	if ( (__wfs_flag < ticks) && (millis() - start_millis >= timeout) ) {
 		errcode = WDERR_WFS_DEAD;
+			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 8000);
+			delay(4000);
+			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=4,\"TCP\",\"192.168.42.1\",15566"), true, s_OK, 10000)) {
+				if (esp8266.sendCmd_P(PSTR("AT+CIPSENDEX=4,2000\r\n"), true, gt, 10000)) {
+					Serial.println("ERROR: no water in tank!");
+					Serial.print("__wfs_flag: ");
+					Serial.println(__wfs_flag, DEC);
+					Serial.print("ticks: ");
+					Serial.println(ticks, DEC);
+		// 				Serial.write(0);
+					esp8266.sendZeroChar("SEND OK", 10000);
+		// 					delay(2000);
+				} /*else {
+					Serial1.println(F("Send not inited=("));
+				}*/
+			}/* else {
+					Serial1.println(F("mail: CNX FAULT"));
+			}*/
+			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 3000);
  	}
 // 	Serial1.println(__LINE__, DEC);
- 	Serial1.println(F("end of measure"));
- 	Serial1.flush();
+//  	Serial1.println(F("end of measure"));
+//  	Serial1.flush();
  	Serial1.print(F("ticks:"));
- 	Serial1.print(ticks, DEC);
- 	Serial1.print(F("flag:["));
- 	Serial1.print(__wfs_flag, DEC);
- 	Serial1.println(F("]"));
- 	Serial1.flush();
+//  	Serial1.println(ticks, DEC);
+//  	Serial1.print(F("flag:["));
+ 	Serial1.println(__wfs_flag, DEC);
+//  	Serial1.println(F("]"));
+//  	Serial1.flush();
  	uint16_t _ml = round(__wfs_flag * 1000.0/(float)wftpl);
 	digitalWrite(VCC_PUMP_EN, LOW);
 // 	ws.dec(ws_index, ml);
@@ -811,9 +773,9 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (cur_x == -1) {
 				if (X_AT_SLOT && X_AT_SLOT ) {
 					++cur_x;
-					Serial1.print(millis(), DEC);
-  					Serial1.print(" at x#1:");
- 					Serial1.println(cur_x, DEC);
+// 					Serial1.print(millis(), DEC);
+//   					Serial1.print(" at x#1:");
+//  					Serial1.println(cur_x, DEC);
 					xs = ((cur_x < x) ? WDST_WAIT_WALL_FWD/*2*/ : WDST_STOP/*0*/);
 //   					Serial1.print("xs=");
 //   					Serial1.println(xs, DEC);
@@ -821,9 +783,9 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				}
 				
 				if (xs == WDST_STOP/*0*/) {
-					Serial1.print(millis(), DEC);
-  					Serial1.print(" finished x#1 at ");
-  					Serial1.println(cur_x, DEC);
+// 					Serial1.print(millis(), DEC);
+//   					Serial1.print(" finished x#1 at ");
+//   					Serial1.println(cur_x, DEC);
 					stopX();
 				}
 			} else {
@@ -831,17 +793,17 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				if (X_AT_SLOT) {
 					if (millis() - x_ms > MIN_MOVE_TIME_BTW) {
 						++cur_x;
-						Serial1.print(millis(), DEC);
-  						Serial1.print(" at x#2:");
-  						Serial1.println(cur_x, DEC);
+// 						Serial1.print(millis(), DEC);
+//   						Serial1.print(" at x#2:");
+//   						Serial1.println(cur_x, DEC);
 						x_ms = millis();
 						xs = ((cur_x < x) ? /*2*/WDST_WAIT_WALL_FWD : WDST_STOP/*0*/);
 					}
 				}//if step=high
 				if (xs == WDST_STOP/*0*/) {
-					Serial1.print(millis(), DEC);
-  					Serial1.print(" finished x#2 at ");
-  					Serial1.println(cur_x, DEC);
+// 					Serial1.print(millis(), DEC);
+//   					Serial1.print(" finished x#2 at ");
+//   					Serial1.println(cur_x, DEC);
 					stopX();
 				}//is xs == 0
 			}//else if cur_x > -1
@@ -858,9 +820,9 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 // 				Serial1.println(F("xs switch to wait low"));
 				x_ms = millis();
 				--cur_x;
-				Serial1.print(millis(), DEC);
-				Serial1.print(" at x#3:");
-  				Serial1.println(cur_x, DEC);
+// 				Serial1.print(millis(), DEC);
+// 				Serial1.print(" at x#3:");
+//   				Serial1.println(cur_x, DEC);
 				xs = WDST_WAIT_WALL_BWD;
 			}
 		} else if (xs == WDST_WAIT_WALL_BWD) {
@@ -904,9 +866,9 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 			if (cur_y == -1) {
 				if (Y_AT_SLOT && Y_AT_SLOT ) {
 					++cur_y;
-					Serial1.print(millis(), DEC);
-					Serial1.print(" at y#1:");
-					Serial1.println(cur_y, DEC);
+// 					Serial1.print(millis(), DEC);
+// 					Serial1.print(" at y#1:");
+// 					Serial1.println(cur_y, DEC);
 					ys = ((cur_y < y) ? WDST_WAIT_WALL_FWD/*2*/ : WDST_STOP/*0*/);
 // 					Serial1.print("ys=");
 // 					Serial1.println(ys, DEC);
@@ -914,9 +876,9 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				}
 
 				if (ys == WDST_STOP/*0*/) {
-					Serial1.print(millis(), DEC);
-					Serial1.print(" finished y#1 at ");
-					Serial1.println(cur_y, DEC);
+// 					Serial1.print(millis(), DEC);
+// 					Serial1.print(" finished y#1 at ");
+// 					Serial1.println(cur_y, DEC);
 					stopY();
 				}
 			} else {
@@ -924,20 +886,20 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				if (Y_AT_SLOT) {
 					if (millis() - y_ms > MIN_MOVE_TIME_BTW) {
 						++cur_y;
-						Serial1.print(millis(), DEC);
-						Serial1.print(" at y#2:");
-						Serial1.println(cur_y, DEC);
+// 						Serial1.print(millis(), DEC);
+// 						Serial1.print(" at y#2:");
+// 						Serial1.println(cur_y, DEC);
 						y_ms = millis();
 						ys = ((cur_y < y) ? /*2*/WDST_WAIT_WALL_FWD : WDST_STOP/*0*/);
 					} else {
-						Serial1.print(millis(), DEC);
-						Serial1.println(" Y at slot#1");
+// 						Serial1.print(millis(), DEC);
+// 						Serial1.println(" Y at slot#1");
 					}
 				}//if step=high
 				if (ys == WDST_STOP/*0*/) {
-					Serial1.print(millis(), DEC);
-					Serial1.print(" finished y#2 at ");
-					Serial1.println(cur_y, DEC);
+// 					Serial1.print(millis(), DEC);
+// 					Serial1.print(" finished y#2 at ");
+// 					Serial1.println(cur_y, DEC);
 					stopY();
 				}//is ys == 0
 			}//else if cur_y > -1
@@ -954,13 +916,13 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 				if ((millis() - y_ms > MIN_MOVE_TIME_BTW) ) {
 					y_ms = millis();
 					--cur_y;
-					Serial1.print(millis(), DEC);
-					Serial1.print(" at y#3:");
-					Serial1.println(cur_y, DEC);
+// 					Serial1.print(millis(), DEC);
+// 					Serial1.print(" at y#3:");
+// 					Serial1.println(cur_y, DEC);
 					ys = WDST_WAIT_WALL_BWD;
 				} else {
-					Serial1.print(millis(), DEC);
-					Serial1.println(" Y at slot#2");
+// 					Serial1.print(millis(), DEC);
+// 					Serial1.println(" Y at slot#2");
 				}
 			}
 		} else if (ys == WDST_WAIT_WALL_BWD) {

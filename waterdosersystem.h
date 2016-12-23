@@ -39,7 +39,7 @@ protected:
 	void dope(AirTime at=atMedium);
 public:
 	int getCurPos();
-	void servoMove(uint8_t new_pos);
+	void servoMove(uint8_t new_pos, bool (*test_ok)());
 	bool park();
 	bool parkX();
 	bool parkY();

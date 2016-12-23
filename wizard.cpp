@@ -12,6 +12,9 @@ extern I2CExpander i2cExpander;
 extern ESP8266 esp8266;
 extern WateringController wctl;
 
+extern bool Z_AT_DDC();
+extern bool Z_AT_TDC();
+
 Wizard::Wizard()
 {
 	this->n_iic = 0;
@@ -69,25 +72,25 @@ void Wizard::cfg_run()
 		h = g_cfg.config.wdz_ddc;
 		do {
 			ask_uint16(F("Z-axe down DC:"), 0, 180, h);
-			water_doser.servoMove(h);
+			water_doser.servoMove(h, Z_AT_DDC);
 		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
 		g_cfg.config.wdz_ddc = h;
 
 		h = g_cfg.config.wdz_tdc;
 		do {
 			ask_uint16(F("Z-axe top DC:"), 0, 180, h);
-			water_doser.servoMove(g_cfg.config.wdz_ddc);
+			water_doser.servoMove(g_cfg.config.wdz_ddc, Z_AT_DDC);
 			delay(500);
-			water_doser.servoMove(h);
+			water_doser.servoMove(h, Z_AT_TDC);
 		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
 		g_cfg.config.wdz_tdc = h;
 		
 		h = g_cfg.config.wdz_top;
 		do {
 			ask_uint16(F("Z-axe top default pos:"), 0, 180, h);
-			water_doser.servoMove(g_cfg.config.wdz_tdc);
+			water_doser.servoMove(g_cfg.config.wdz_tdc, Z_AT_TDC);
 			delay(500);
-			water_doser.servoMove(h);
+			water_doser.servoMove(h, Z_AT_TDC);
 		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
 		g_cfg.config.wdz_top = h;
 	}
