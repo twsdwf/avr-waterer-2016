@@ -49,7 +49,7 @@ PAGE		content
 
 #define WFC_PAGE					 	1
 #define POTS_DATA_PAGE0					(4)
-
+#define WATERSTORAGE_PAGE0				(85)
 
 #define POT_NAME_LENGTH		(18)
 

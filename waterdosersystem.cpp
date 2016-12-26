@@ -299,10 +299,16 @@ void WaterDoserSystem::servoMove(uint8_t new_pos, bool (*test_ok)())
 		Serial1.print(" ");
 		delay(50);
 	}
+	
+	if (!test_ok()) {
+		cur_pos -= 3 * dp;
+		z_axe.write(cur_pos);
+		delay(300);
+	}
+	z_axe.detach();
 	Serial1.print(F("positioning status: "));
 	Serial1.println(test_ok(), DEC);
-	delay(300);
-	z_axe.detach();
+	
 }
 
 

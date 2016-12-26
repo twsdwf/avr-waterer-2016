@@ -11,6 +11,7 @@
 #include "i2cexpander.h"
 #include<EEPROM.h>
 #include "wateringcontroller.h"
+#include "waterstorage.h"
 // #include "mmc.h"
 // #include "stat.h"
 // #include "errlogger.h"
@@ -561,7 +562,7 @@ void WateringController::cleanDayStat()
 
 void WateringController::printDayStat(HardwareSerial* output)
 {
-	int day_total=0, ml;
+	int day_total = 0, ml;
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		potConfig pot = g_cfg.readPot(i);
 		output->print(i, DEC);
@@ -591,4 +592,16 @@ void WateringController::printDayStat(HardwareSerial* output)
 	output->print(F("day usage:"));
 	output->print(day_total, DEC);
 	output->println(F("ml"));
+	
+	WaterStorages ws;
+	output->print(F("Water storage remains:"));
+	uint16_t avail = ws.avail(0);
+	output->println(avail, DEC);
+	
+	output->print(F("Forecast: end of water in "));
+	output->print(floor(avail/(day_total * 1.1)));
+	output->print(F(" days"));
+	
 }
+
+

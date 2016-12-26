@@ -1,0 +1,24 @@
+#######################################
+# Syntax Coloring Map For LiquidCrystal
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ShiftOut	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+digitalWrt	KEYWORD2
+setData KEYWORD2
+digitalWrtFull	KEYWORD2
+sendData	KEYWORD2
+isOk	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+

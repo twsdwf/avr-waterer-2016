@@ -42,7 +42,9 @@ void Configuration::begin()
 
 bool Configuration::readWaterStorageData(WaterStorageData*wsd, uint8_t index)
 {
-	uint8_t buffer[512] = {0};
+	memset(wsd, 0, sizeof(WaterStorageData));
+	mem.readBuffer((WATERSTORAGE_PAGE0 + index) * MEM_PAGE_SIZE, (char*)wsd, sizeof(WaterStorageData));
+	return true;
 // 	mmc::readSector(buffer, WATER_STORAGE_PAGE);
 // 	for (int i =0 ;i < 512;++i) {
 // 		Serial1.print(buffer[i], DEC);
@@ -73,13 +75,12 @@ uint8_t Configuration::readWScount()
 
 void Configuration::setWScount(uint8_t count)
 {
-	uint8_t buffer[512] = {0};
 
 }
 
 bool Configuration::writeWaterStorageData(WaterStorageData*wsd, uint8_t index)
 {
-	uint8_t buffer[512] = {0};
+	mem.writeBuffer((WATERSTORAGE_PAGE0 + index) * MEM_PAGE_SIZE, (char*)wsd, sizeof(WaterStorageData));
 	return true;
 }
 

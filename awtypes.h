@@ -193,6 +193,7 @@ typedef struct globalConfig{
 	uint8_t wdz_top;
 	uint8_t wdz_tdc;
 	uint8_t wdz_ddc;
+// 	uint8_t ws_count; future use
 }globalConfig;//21 bytes
 
 extern HardwareSerial Serial1;

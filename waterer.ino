@@ -42,7 +42,7 @@
 #include "waterdosersystem.h"
 #include "i2cexpander.h"
 #include "wateringcontroller.h"
-// #include "waterstorage.h"
+#include "waterstorage.h"
 #include "esp8266.h"
 #include "wizard.h"
 extern "C" {
@@ -93,6 +93,8 @@ int8_t iForceWatering = 0;
 extern char*str;
 
 // void run_wizard(uint8_t show_hello=1);
+
+void sendDailyReport();
 
 /** ************************************************************************************************
  * 			functions
@@ -551,6 +553,8 @@ bool doCommand(char*cmd, HardwareSerial*output)
 	} else if (IS_P(cmd, PSTR("wizard"), 6)) {
 		Wizard w;
 		w.run();
+	} else if (IS_P(cmd, PSTR("SDR"), 3)) {
+		sendDailyReport();
 	}
 	return true;
 }
@@ -637,7 +641,7 @@ void setup()
 	g_cfg.begin();
  	g_cfg.readGlobalConfig();
 	
-//  	water_doser.begin(); !DBG
+ 	water_doser.begin(); //!DBG
 	
 // 	water_doser.testAll();
 // #ifdef USE_LEDS
@@ -790,6 +794,16 @@ void loop()
 		digitalWrite(PUMP_PIN, LOW);
 		digitalWrite(VCC_PUMP_EN, LOW);
 		leds.digitalWrite(LED_BLUE, LOW);
+
+		WaterStorages ws;
+		WaterStorageData wsd = ws.readStorageData(0);
+		wsd.enabled = 1;
+		wsd.vol = 10000;
+		wsd.spent = 0;
+		wsd.pump_pin = PUMP_PIN;
+		wsd.prior = 1;
+		ws.updateStorageData(0, wsd);
+		ws.setStorageStateFull(0);
 	}
 // 	leds.digitalWrite(0, _pulse_state);
 #endif
@@ -803,7 +817,7 @@ void loop()
 
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
-	if (now.minute() % 5 == 0 && now_m!=last_temp_read) {
+	if (now.minute() % 5 == 0 && now_m != last_temp_read) {
 		readDS18B20();
 		last_temp_read = now_m;
 	}
@@ -846,12 +860,13 @@ void loop()
 		leds.digitalWrite(LED_BLUE, 0);
 	}
 #endif
+	bool b_time_to_water = (now.dayOfWeek() < 6 && now_m > g_cfg.config.water_start_time && now_m < g_cfg.config.water_end_time)
+							||
+							(now.dayOfWeek() >= 6 && now_m > g_cfg.config.water_start_time_we && now_m < g_cfg.config.water_end_time_we);
 	if ( g_cfg.config.enabled
-			&& (
-					(now.dayOfWeek() < 6 && now_m > g_cfg.config.water_start_time && now_m < g_cfg.config.water_end_time)
-				||
-					(now.dayOfWeek() >= 6 && now_m > g_cfg.config.water_start_time_we && now_m < g_cfg.config.water_end_time_we)
-			) || iForceWatering) {
+			&& (b_time_to_water
+			 || iForceWatering)) {
+		
 		midnight_skip = false;
 		
 		if ( (now.secondstime() - last_check_time) % 60 == 0) {
@@ -870,7 +885,19 @@ void loop()
 			clock.writeRAMbyte(LAST_CHECK_TS_4, last_check_time & 0xFF);
 			iForceWatering = 0;
 		}
-	} else if (now_m < 2 && !midnight_skip) {//midnight
+		
+		DateTime nt(now.secondstime() + g_cfg.config.test_interval * 60);
+		uint16_t nt_m = nt.hour()*100 + nt.minute();
+		
+		b_time_to_water = (now.dayOfWeek() < 6 && nt_m > g_cfg.config.water_start_time && nt_m < g_cfg.config.water_end_time);
+		b_time_to_water = b_time_to_water || (now.dayOfWeek() >= 6 && nt_m > g_cfg.config.water_start_time_we && nt_m < g_cfg.config.water_end_time_we);
+		
+		if (!b_time_to_water) {
+			sendDailyReport();
+			
+		}
+	}
+	if (now_m < 2 && !midnight_skip) {//midnight
 //  		Serial1.println("midnight jobs");
 		last_check_time = 0;
 		clock.writeRAMbyte(LAST_CHECK_TS_1, 0);
@@ -880,10 +907,22 @@ void loop()
 		Serial1.flush();
 
 		midnight_skip = true;
+		
+		uint16_t ml = 0, day_total;
+		
+		for (int i = 0; i < g_cfg.config.pots_count; ++i) {
+			ml = wctl.readDayML(i);
+			day_total += ml;
+		}//for i
+		
+		WaterStorages ws;
+		ws.dec(0, day_total);
+		
 		if (g_cfg.config.esp_en) {
 			now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
-			sendDailyReport();
+			
+// 			sendDailyReport();
 		}
 		
 		wctl.cleanDayStat();

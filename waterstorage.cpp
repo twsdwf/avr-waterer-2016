@@ -6,7 +6,8 @@ extern Configuration g_cfg;
 
 void WaterStorages::begin()
 {
-	storages_count = g_cfg.readWScount();
+	return;
+// 	storages_count = g_cfg.readWScount();
 }
 
 WaterStorageData WaterStorages::readStorageData(uint8_t index)
@@ -89,4 +90,5 @@ bool WaterStorages::deleteStorage(uint8_t index)
 	}
 	--storages_count;
 	g_cfg.setWScount(storages_count);
+	return true;
 }
