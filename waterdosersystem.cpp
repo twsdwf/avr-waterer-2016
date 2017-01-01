@@ -23,6 +23,10 @@
 #define WDERR_POS_ERR		3
 
 extern ESP8266 esp8266;
+extern char*str;
+extern Configuration g_cfg;
+// extern ErrLogger logger;
+extern I2CExpander i2cExpander;
 
 #ifdef MY_ROOM
 	#define X_AT_SLOT (digitalRead(X_STEP_PIN) == HIGH)
@@ -50,7 +54,16 @@ bool Z_AT_DDC()
 	#define Y_AT_SLOT (digitalRead(Y_STEP_PIN) == LOW)
 	#define X_AT_BEGIN (LOW == digitalRead(X_BEGIN_PIN))
 	#define Y_AT_BEGIN (HIGH == digitalRead(Y_BEGIN_PIN))
-	#define Z_AT_TDC()	(LOW == digitalRead(Z_AXE_UP_PIN))
+
+bool Z_AT_TDC()
+{
+	return true;
+}
+
+bool Z_AT_DDC()
+{
+	return true;
+}
 #endif
 
 #define WDST_STOP		0
@@ -69,10 +82,6 @@ typedef enum WaterDoserSystemState{
 	wdstError
 }WaterDoserSystemState;
 
-extern char*str;
-extern Configuration g_cfg;
-// extern ErrLogger logger;
-extern I2CExpander i2cExpander;
 
 static volatile uint16_t __wfs_flag = 0;
 
@@ -149,17 +158,30 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 // 	digitalWrite(Y_AXE_EN, LOW);
 	
 // 	pinMode(Z_AXE_UP_PIN, INPUT);
-	
+#ifdef Z_AXE_DOWN_PIN	
 	pinMode(Z_AXE_DOWN_PIN, INPUT);
-
+#endif
 	cur_x = 0xFF;
 	cur_y = 0xFF;
 // 	pinMode(Z_AXE_DIR, OUTPUT);
 // 	pinMode(Z_AXE_EN, OUTPUT);
 	z_pos = g_cfg.config.wdz_top;
+#ifndef BIG_ROOM
    	servoUp();
+#endif
 	park();
 	moveToPos(0, 0);
+// #ifdef BIG_ROOM
+// 	z_axe.attach(Z_AXE_SERVO_PIN);
+// 	z_axe.write(10);
+// 	delay(1000);
+// 	z_axe.detach();
+// 	delay(8000);
+// 	z_axe.attach(Z_AXE_SERVO_PIN);
+// 	z_axe.write(180);
+// 	delay(1000);
+// 	z_axe.detach();
+// #endif
 	Serial1.println(F("wd begin [DONE]"));
 }
 
@@ -288,27 +310,37 @@ void WaterDoserSystem::servoMove(uint8_t new_pos, bool (*test_ok)())
 // 		return;
 // 	}
 	int dp = (new_pos >= cur_pos ? 2 : -2);
-	z_axe.attach(Z_AXE_SERVO_PIN);
+	z_axe.attach(Z_AXE_SERVO_PIN, 600, 2000);
 // 	z_axe.write(new_pos);
 // 	delay(1000);
-	while ( abs(cur_pos - new_pos) > 1 && !test_ok()) {
+	while ( abs(cur_pos - new_pos) > 1 
+#ifdef MY_ROOM
+		&& !test_ok()
+#endif
+	) {
 		cur_pos += dp;
+		if (cur_pos < 2 || cur_pos > 190) {
+			Serial1.println(F("ERROR: angle overflow"));
+			break;
+		}
 		z_pos = cur_pos;
 		z_axe.write(cur_pos);
 		Serial1.print(cur_pos);
 		Serial1.print(" ");
 		delay(50);
 	}
-	
+#ifdef MY_ROOM
 	if (!test_ok()) {
 		cur_pos -= 3 * dp;
 		z_axe.write(cur_pos);
 		delay(300);
 	}
+#endif
 	z_axe.detach();
+#ifdef MY_ROOM
 	Serial1.print(F("positioning status: "));
 	Serial1.println(test_ok(), DEC);
-	
+#endif
 }
 
 
@@ -658,6 +690,15 @@ bool WaterDoserSystem::parkY()
 	return true;
 }
 
+void WaterDoserSystem::runSquare()
+{
+	__moveToPos(0, 0);
+	__moveToPos(0, WD_SIZE_Y - 1);
+	__moveToPos(WD_SIZE_X - 1, WD_SIZE_Y - 1);
+	__moveToPos(WD_SIZE_X - 1, 0);
+	__moveToPos(0, 0);
+}
+
 bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 {
 	if (x >= WD_SIZE_X) {
@@ -682,6 +723,12 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 		Serial1.println(F("no move due Z-axe errors"));
 		return false;
 	}
+	return __moveToPos(x, y);
+}
+
+
+bool WaterDoserSystem::__moveToPos(uint8_t x, uint8_t y)
+{
 // 	Serial1.print(millis(), DEC);
 // 	Serial1.print(" cur pos (");
 // 	Serial1.print(cur_x, DEC);

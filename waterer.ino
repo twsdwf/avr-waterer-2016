@@ -175,6 +175,7 @@ void dumpPotConfig(uint8_t index, HardwareSerial* output)
 	}
 }
 
+#ifdef MY_ROOM
 uint16_t last_temp_read = 0;
 
 float readTemp(uint8_t*addr)
@@ -239,6 +240,7 @@ void readDS18B20(bool send=true)
 		}
 	}
 }
+#endif
 
 void printGcfg(HardwareSerial*output)
 {
@@ -293,7 +295,9 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		Serial1.println("done;");
 	} else */
 	if (IS_P(cmd, PSTR("temp?"), 5)) {
+#ifdef MY_ROOM
 		readDS18B20(false);
+#endif
 	} else if (IS_P(cmd, PSTR("sdump"), 5)) {
 // 		wctl.run_checks();
 		wctl.dumpSensorValues(output);
@@ -555,6 +559,8 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		w.run();
 	} else if (IS_P(cmd, PSTR("SDR"), 3)) {
 		sendDailyReport();
+	} else if (IS_P(cmd, PSTR("RSQ"), 3)) {
+		water_doser.runSquare();
 	}
 	return true;
 }
@@ -717,6 +723,7 @@ void setup()
 		wctl.setStatDay(now.day());
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 	}
+#ifdef MY_ROOM
 	uint8_t addr[8];
 	while ( ds.search(addr)) {
 		Serial1.print("ROM =");
@@ -730,6 +737,7 @@ void setup()
 //     Serial1.println();
     ds.reset_search();
 //     delay(250);
+#endif
 	Serial1.println(F("setup() end"));
 }
 
@@ -761,6 +769,12 @@ bool checkContinue()
 
 void sendDailyReport()
 {
+	static uint8_t last_sent_day = -1;
+	DateTime now = clock.now();
+	
+	if (last_sent_day > 0 && now.day() == last_sent_day) {
+		return;
+	}
 	esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 8000);
 	delay(4000);
 	if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=4,\"TCP\",\"192.168.42.1\",15566"), true, s_OK, 10000)) {
@@ -768,8 +782,9 @@ void sendDailyReport()
 			Serial.println("Daily watering statictic");
 			wctl.printDayStat(&Serial);
 // 				Serial.write(0);
-			esp8266.sendZeroChar("SEND OK", 10000);
-// 					delay(2000);
+			if (esp8266.sendZeroChar("SEND OK", 10000)) {
+				last_sent_day = now.day();
+			}
 		} else {
 			Serial1.println(F("Send not inited=("));
 		}
@@ -817,11 +832,12 @@ void loop()
 
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
+#ifdef MY_ROOM
 	if (now.minute() % 5 == 0 && now_m != last_temp_read) {
 		readDS18B20();
 		last_temp_read = now_m;
 	}
-	
+#endif
 	if (now_m > 2400 || now.year() < 2016) {
 		if (g_cfg.config.esp_en) {
 			now = esp8266.getTimeFromNTPServer();

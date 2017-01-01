@@ -37,9 +37,11 @@ protected:
 	bool nextX();
 	bool nextY();
 	void dope(AirTime at=atMedium);
+	bool __moveToPos(uint8_t x, uint8_t y);
 public:
 	int getCurPos();
 	void servoMove(uint8_t new_pos, bool (*test_ok)());
+	void runSquare();
 	bool park();
 	bool parkX();
 	bool parkY();

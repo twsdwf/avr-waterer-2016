@@ -595,7 +595,7 @@ void WateringController::printDayStat(HardwareSerial* output)
 	
 	WaterStorages ws;
 	output->print(F("Water storage remains:"));
-	uint16_t avail = ws.avail(0);
+	uint16_t avail = ws.avail(0) - day_total;
 	output->println(avail, DEC);
 	
 	output->print(F("Forecast: end of water in "));
