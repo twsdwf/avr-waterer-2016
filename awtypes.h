@@ -42,19 +42,24 @@ typedef struct wpHumAndDry{//2
 typedef struct wpByTime{//3
 	uint16_t min_value;
 	uint16_t interval;
-	uint8_t ml;
+	uint8_t  ml;
 }wpByTime;//size = 5
-
-
+/*
+typedef struct wpConstHumWithMin{//4
+	wpConstantHum prog;
+	uint8_t  min_day_ml;
+}wpConstHumWithMin;//size = 4
+*/
 typedef union atomicProgram{
-	wpConstantHum 	const_hum;
-	wpHumAndDry		hum_and_dry;
-	wpByTime		by_time;
+	wpConstantHum 		const_hum;
+	wpHumAndDry			hum_and_dry;
+	wpByTime			by_time;
+// 	wpConstHumWithMin	const_hum_wm;
 }atomicProgram;
 
 typedef struct wpShrinkedTime{//4
-	uint16_t from_time;
-	uint16_t to_time;
+	uint16_t 	from_time;
+	uint16_t 	to_time;
 	atomicProgram program;
 }wpShrinkedTime;//size=5  d=+4
 
@@ -83,7 +88,7 @@ typedef struct wateringProgram{
 
 typedef struct sensorValues{
 	uint8_t address;
-	int pin_values[16];
+	uint16_t pin_values[16];
 }sensorValues;
 
 #define WCFG_STATE_WATERING		0x00
@@ -175,7 +180,7 @@ typedef struct WaterDoserSystemConfig{
 typedef struct globalConfig{
 	uint16_t enabled:1;
 	uint16_t esp_en:1;
-	uint16_t flags:14;
+	uint16_t flags:13;
 // 	uint8_t i2c_expanders_count;
 	uint8_t pots_count;
 // 	uint8_t dosers_count;
@@ -188,11 +193,6 @@ typedef struct globalConfig{
 	uint16_t water_end_time_we;
 	uint8_t sensor_measures;
 	uint8_t test_interval;
- 	uint16_t lux_barrier_value;
-	/*water doser Z-axe servo angles (top default, top dead center, down dead center*/
-	uint8_t wdz_top;
-	uint8_t wdz_tdc;
-	uint8_t wdz_ddc;
 // 	uint8_t ws_count; future use
 }globalConfig;//21 bytes
 

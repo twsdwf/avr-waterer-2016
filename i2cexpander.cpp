@@ -107,12 +107,12 @@ int16_t I2CExpander::read_pin(uint8_t addr, uint8_t pin)
 		this->write(PCF_PIN_D, pin & 8);
 		this->write(PCF_PIN_INH, LOW);
 // 		this->write(PCF_PIN_EN1, HIGH);
-		pinMode(A1, INPUT);
+		pinMode(A0, INPUT);
 		for (uint8_t i=0; i < g_cfg.config.sensor_measures; ++i) {
 			if (g_cfg.config.sensor_read_time > 2) {
 				delay(g_cfg.config.sensor_read_time);
 			}
-			n += analogRead(1);
+			n += analogRead(0);
 		}
 		n /= g_cfg.config.sensor_measures;
 		
@@ -144,7 +144,7 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 // 	Serial1.println(data->address, DEC);
 	pinMode(A1, INPUT);
 	for (uint8_t pin = 0; pin < 16; ++pin) {
-		this->write8(1<<PCF_PIN_INH);
+		this->write8(1 << PCF_PIN_INH);
 		this->write(PCF_PIN_INH, HIGH);
 		this->write(PCF_PIN_A, pin & 1);
 		this->write(PCF_PIN_B, pin & 2);
@@ -155,7 +155,7 @@ bool I2CExpander::readSensorValues(sensorValues*data)
 		data->pin_values[pin] = 0;
 		for(uint8_t i = 0; i < g_cfg.config.sensor_measures; ++i) {
 			delay(g_cfg.config.sensor_read_time);
-			data->pin_values[pin] += analogRead(1);
+			data->pin_values[pin] += analogRead(0);
 		}
 		data->pin_values[pin] /= g_cfg.config.sensor_measures;
 //  		Serial1.print(data->address, DEC);

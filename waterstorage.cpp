@@ -6,14 +6,14 @@ extern Configuration g_cfg;
 
 void WaterStorages::begin()
 {
+	storages_count = 1;
 	return;
-// 	storages_count = g_cfg.readWScount();
 }
 
 WaterStorageData WaterStorages::readStorageData(uint8_t index)
 {
 	WaterStorageData result;
-	if (index > storages_count) {
+	if (index > getStoragesCount()) {
 		memset(&result, 0, sizeof(result));
 		return result;
 	}
@@ -25,19 +25,39 @@ WaterStorageData WaterStorages::readNonemptyStorage(uint8_t& index)
 {
 	WaterStorageData wsd;
 	memset(&wsd, 0, sizeof(wsd));
-	for (uint8_t i = 0; i < storages_count; ++i) {
-		wsd = this->readStorageData(i);
-		if (0==wsd.enabled) continue;
-		if (wsd.vol - wsd.spent <= 0) continue;
+	Serial1.print(F("storages:"));
+	Serial1.print(getStoragesCount());
+	Serial1.print(" ");
+	Serial1.println(storages_count, DEC);
+	for (uint8_t i = 0; i < getStoragesCount(); ++i) {
+		Serial1.print(F("read storage "));
+		Serial1.print(i, DEC);
+		 g_cfg.readWaterStorageData(&wsd, i);
+		if (0 == wsd.enabled) {
+			Serial1.println(F("  storage is off"));
+			continue;
+		} else {
+			Serial1.print(F(" en:1 "));
+		}
+		Serial1.print(F(" volume:"));
+		Serial1.print(wsd.vol);
+		Serial1.print(F(" spent:"));
+		Serial1.println(wsd.spent);
+		if (wsd.vol <= wsd.spent) {
+			Serial1.println(F("  storage is ran out"));
+			continue;
+		}
 		index = i;
 		return wsd;
 	}
+	Serial1.println(F("\r\nstorage not found"));
 	index = 255;
 	return wsd;
 }
 
 uint8_t WaterStorages::getStoragesCount()
 {
+	storages_count = 1;
 	return storages_count;
 }
 
@@ -57,9 +77,18 @@ void WaterStorages::setStorageStateFull(uint8_t index)
 
 void WaterStorages::dec(uint8_t index, uint16_t ml)
 {
-	WaterStorageData result = this->readStorageData(index);
-	result.spent += ml;
-	updateStorageData(index, result);
+	if (index < 100) {
+		WaterStorageData result;
+		g_cfg.readWaterStorageData(&result, index);
+		Serial1.print(F("dec #"));
+		Serial1.print(index, DEC);
+		Serial1.print(F(" to "));
+		Serial1.print(ml, DEC);
+		Serial1.println(F("ml"));
+		result.spent += ml;
+		g_cfg.writeWaterStorageData(&result, index);
+		//updateStorageData(index, result);
+	}
 }
 
 uint16_t WaterStorages::avail(uint8_t index)
@@ -75,6 +104,7 @@ void WaterStorages::updateStorageData(uint8_t index, WaterStorageData& data)
 
 uint8_t WaterStorages::addStorage(WaterStorageData& data)
 {
+	return 255;
 	g_cfg.writeWaterStorageData(&data, storages_count);
 	++storages_count;
 	g_cfg.setWScount(storages_count);
@@ -84,7 +114,8 @@ uint8_t WaterStorages::addStorage(WaterStorageData& data)
 
 bool WaterStorages::deleteStorage(uint8_t index)
 {
-	for (uint8_t i = index;i < storages_count - 2; ++i) {
+	return false;
+	for (uint8_t i = index;i < getStoragesCount() - 2; ++i) {
 		WaterStorageData wsd1=readStorageData(i + 1);
 		updateStorageData(i, wsd1);
 	}

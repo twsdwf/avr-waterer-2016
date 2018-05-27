@@ -9,7 +9,6 @@
 	#include"bootscreen.h"
 #endif
 
-#include <Servo.h>
 
 typedef enum AirTime{
 	atShort=1,
@@ -20,25 +19,25 @@ typedef enum AirTime{
 class WaterDoserSystem
 {
 protected:
-	Servo z_axe;
 	uint8_t  expander_addr, z_pos;
 	uint16_t expander_state;
 	I2CExpander* exp;
-	int8_t cur_x, cur_y, errcode;
-// 	Servo srv;
-// 	int readCmdStatus(uint32_t timeout=0, char*replyOK=NULL);
-// 	bool execCmd(char*cmd, uint32_t timeout = 0, uint8_t tries = 0, char*replyOK = NULL);
+	int8_t cur_x, cur_y, errcode, _is_run;
 	void bwdX();
 	void fwdX();
 	void bwdY();
 	void fwdY();
-	void stopX();
-	void stopY();
 	bool nextX();
 	bool nextY();
 	void dope(AirTime at=atMedium);
 	bool __moveToPos(uint8_t x, uint8_t y);
+	void __isr_en();
+	void __isr_off();
+	void __isr_reset();
 public:
+	void stopX();
+	void stopY();
+	bool isRun();
 	int getCurPos();
 	void servoMove(uint8_t new_pos, bool (*test_ok)());
 	void runSquare();

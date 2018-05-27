@@ -314,7 +314,7 @@ bool ESP8266::connect(uint32_t timeout)
 		if (ret < 2) {
 			if (sendCmd_P(PSTR("AT+CWQAP"), true, s_OK, 5000) &&
 			sendCmd_P(PSTR("AT+CWMODE=1"), true, s_OK, 5000) &&
-			sendCmd_P(PSTR("AT+CWJAP=\"Pi\",\"kopernik1533\""), true, PSTR("WIFI GOT IP"), 20000)) {
+			sendCmd_P(PSTR("AT+CWJAP=\"MGTS_GPON_2A88\",\"PEDC7G7E\""), true, PSTR("WIFI GOT IP"), 20000)) {
 				sendCmd_P(PSTR("AT+CWSAP=\"AI-water\",\"BvftghjKIUYGc56(&^Tfc\",9,3"), true, s_OK, 5000);
 			} else {
 				continue;
@@ -372,8 +372,8 @@ DateTime ESP8266::getTimeFromNTPServer()
 	char buff[20];
 
 	sendCmd_P(PSTR("AT+CIPCLOSE=3"), true, s_OK, 1000);
-// 	sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"129.6.15.28\",123"), true, s_OK, 3000) &&
-	sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192.168.42.1\",123"), true, s_OK, 3000) &&
+	sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"129.6.15.28\",123"), true, s_OK, 3000) &&
+	//sendCmd_P(PSTR("AT+CIPSTART=3,\"UDP\",\"192\",123"), true, s_OK, 3000) &&
 	sprintf(buff, "AT+CIPSEND=3,%d", NTP_PACKET_SIZE);
 	if (sendCmd(buff, true, ">", 1000)) {
 		for (uint8_t i=0; i< NTP_PACKET_SIZE; ++i) {

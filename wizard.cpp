@@ -9,7 +9,9 @@
 extern Configuration g_cfg;
 extern WaterDoserSystem water_doser;
 extern I2CExpander i2cExpander;
+#ifdef USE_ESP8266
 extern ESP8266 esp8266;
+#endif
 extern WateringController wctl;
 
 extern bool Z_AT_DDC();
@@ -43,70 +45,54 @@ void Wizard::cfg_run()
 	h = g_cfg.config.pots_count;
 	g_cfg.config.pots_count = ask_uint16(F("Pots count"), 0, 100, h);
 	if ('Y' == ask_char(F("Change watering time options(Y/N)?"), "YN")) {
-		h=g_cfg.config.water_start_time/100, m=g_cfg.config.water_start_time%100;
+		h=g_cfg.config.water_start_time/100, m=g_cfg.config.water_start_time % 100;
 		ask_uint16(F("Monday-Friday watering start, hour"), 0, 24, h);
 		ask_uint16(F("Monday-Friday watering start, minute"), 0, 60, m);
 		g_cfg.config.water_start_time = h * 100 + m;
-		h = g_cfg.config.water_end_time/100;
-		m = g_cfg.config.water_end_time%100;
+		Serial1.print("result=");
+		Serial1.println(g_cfg.config.water_start_time, DEC);
+		h = g_cfg.config.water_end_time / 100;
+		m = g_cfg.config.water_end_time % 100;
 		ask_uint16(F("Monday-Friday watering end, hour"), 0, 24, h);
 		ask_uint16(F("Monday-Friday watering end, minute"), 0, 60, m);
 		g_cfg.config.water_end_time = h * 100 + m;
-
+		
+		Serial1.print("result=");
+		Serial1.println(g_cfg.config.water_end_time, DEC);
+		
 		h = g_cfg.config.water_start_time_we / 100, m = g_cfg.config.water_start_time_we % 100;
 		ask_uint16(F("Weekend watering start, hour"), 0, 24, h);
 		ask_uint16(F("Weekend watering start, minute"), 0, 60, m);
-		g_cfg.config.water_start_time = h * 100 + m;
+		g_cfg.config.water_start_time_we = h * 100 + m;
+		Serial1.print("result=");
+		Serial1.println(g_cfg.config.water_start_time_we, DEC);
+		
 		h = g_cfg.config.water_end_time_we / 100;
 		m = g_cfg.config.water_end_time_we % 100;
 		ask_uint16(F("Weekend watering end, hour"), 0, 24, h);
 		ask_uint16(F("Weekend watering end, minute"), 0, 60, m);
 		g_cfg.config.water_end_time_we = h * 100 + m;
-		
+		Serial1.print("result=");
+		Serial1.println(g_cfg.config.water_end_time_we, DEC);
 	}
 	h = g_cfg.config.test_interval;
-	g_cfg.config.test_interval = ask_uint16(F("Test interval, minutes"), 0, 180, h);
-	
-	if ('Y' == ask_char(F("Change water doser Z-axe servo angles(Y/N)?"), "YN")) {
-		
-		h = g_cfg.config.wdz_ddc;
-		do {
-			ask_uint16(F("Z-axe down DC:"), 0, 180, h);
-			water_doser.servoMove(h, Z_AT_DDC);
-		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
-		g_cfg.config.wdz_ddc = h;
-
-		h = g_cfg.config.wdz_tdc;
-		do {
-			ask_uint16(F("Z-axe top DC:"), 0, 180, h);
-			water_doser.servoMove(g_cfg.config.wdz_ddc, Z_AT_DDC);
-			delay(500);
-			water_doser.servoMove(h, Z_AT_TDC);
-		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
-		g_cfg.config.wdz_tdc = h;
-		
-		h = g_cfg.config.wdz_top;
-		do {
-			ask_uint16(F("Z-axe top default pos:"), 0, 180, h);
-			water_doser.servoMove(g_cfg.config.wdz_tdc, Z_AT_TDC);
-			delay(500);
-			water_doser.servoMove(h, Z_AT_TDC);
-		} while ('N' == ask_char(F("Is this OK(Y/N)?"), "YN"));
-		g_cfg.config.wdz_top = h;
-	}
+	g_cfg.config.test_interval = ask_uint16(F("Test interval, minutes"), 1, 250, h);
 	
 	g_cfg.config.enabled = (ask_char(F("Enable watering(Y/N)?"), "YN") == 'Y');
 	
+#ifdef USE_ESP8266
 	h = (g_cfg.config.flags & F_ESP_USING)? 1 : 0;
-	
 	m = (ask_char(F("Use esp8266(Y/N)?"), "YN") == 'Y') ? 1 : 0;
 	if ( m > h ) {
 		esp8266.begin(38400, ESP_RST_PIN);
 		esp8266.connect();
 	}
 	g_cfg.config.esp_en = m;
-	
+#else
+	g_cfg.config.esp_en = 0;
+#endif
 	g_cfg.writeGlobalConfig();
+	g_cfg.readGlobalConfig();
 	Serial1.println(F("saved"));
 }
 
@@ -220,6 +206,7 @@ void Wizard::ask_str(const __FlashStringHelper* promt, char*buf, int maxlen,bool
 		Serial1.print(buf);
 		Serial1.println(F(")"));
 	}
+	memset(buf, 0, maxlen + 1);
 // 	Serial1.flush();
 	char*pb = buf;
 	while (1) {
@@ -392,7 +379,7 @@ void Wizard::edit_pot(uint8_t index)
 	if (ask_char(F("Clear day stat for plant?"), "YN") == 'Y') {
 		wctl.writeDayML(index, 0);
 	}
-	
+	Serial1.println(F("[done]"));	
 }
 
 void Wizard::run(uint8_t show_hello)

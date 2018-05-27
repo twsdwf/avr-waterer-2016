@@ -30,9 +30,10 @@ extern I2CExpander i2cExpander;
 // extern ErrLogger logger;
 
 #define POTS_AT_ONCE	24
+	
 uint16_t WateringController::readDayML(uint8_t index)
 {
-	return EEPROM.read(index * 2) | (EEPROM.read(index*2+1)<<8);
+	return EEPROM.read(index * 2) | (EEPROM.read(index * 2 + 1) << 8);
 }
 
 uint8_t WateringController::getStatDay()
@@ -48,7 +49,7 @@ void WateringController::setStatDay(uint8_t day)
 void WateringController::writeDayML(uint8_t index, uint16_t val)
 {
 	EEPROM.write(index * 2, val & 0xFF);
-	EEPROM.write(index * 2 + 1, val>>8);
+	EEPROM.write(index * 2 + 1, val >> 8);
 }
 void WateringController::incDayML(uint8_t index, uint16_t inc)
 {
@@ -75,19 +76,19 @@ void WateringController::init(I2CExpander* _exp)
 		// search how many expander device we have. var bits used for repeat tests.
 		for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 			potConfig pot = g_cfg.readPot(i);
-			if (pot.sensor.dev >=32 && pot.sensor.dev <=39) {
+			if (pot.sensor.dev >=32 && pot.sensor.dev < 39) {
 				if ( !(bits & 1<<(pot.sensor.dev - 32))) {
 					bits |= 1<<(pot.sensor.dev - 32);
 					++sv_count;
 				}
-			} else if (pot.sensor.dev >=56 && pot.sensor.dev <=56+7) {
+			} else if (pot.sensor.dev >=56 && pot.sensor.dev <=56 + 7) {
 				if ( !(bitsa & 1<<(pot.sensor.dev - 56))) {
 					bitsa |= 1<<(pot.sensor.dev - 56);
 					++sv_count;
 				}
 			}
 		}
-   		Serial1.print(F("devices:"));
+   		Serial1.print(F("device count:"));
    		Serial1.println(sv_count, DEC);
 		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
 		if (_sensor_values == 0) {
@@ -95,7 +96,7 @@ void WateringController::init(I2CExpander* _exp)
 			return;
 		}
 
-		memset(_sensor_values, 0, sizeof(sensorValues)*sv_count);
+		memset(_sensor_values, 0, sizeof(sensorValues) * sv_count);
 
 		uint8_t index = 0;
 		
@@ -117,8 +118,8 @@ void WateringController::init(I2CExpander* _exp)
 void WateringController::dumpSensorValues(HardwareSerial*output)
 {
 	i2cexp->i2c_on();
-	Serial1.print(F(" addr="));
-	Serial1.print((int)_sensor_values, DEC);
+	//Serial1.print(F(" addr="));
+	//Serial1.print((int)_sensor_values, DEC);
 
 	for (uint8_t i = 0; i < sv_count; ++i) {
 		Serial1.print(F("addr:"));
@@ -156,8 +157,8 @@ int WateringController::run_checks(HardwareSerial* output)
  	}//for i
 
 	i2cexp->i2c_on();
-	Serial1.print(F(" addr="));
-	Serial1.print((int)_sensor_values, DEC);
+//	Serial1.print(F(" addr="));
+//	Serial1.print((int)_sensor_values, DEC);
 	
 	for (uint8_t i = 0; i < sv_count; ++i) {
 		Serial1.print(F("addr:"));
@@ -218,12 +219,13 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result, Hardw
 	}
 
 	int16_t cur_value = -1;
+	Serial1.print(F(" "));
 	for (uint8_t i = 0; i < sv_count; ++i) {
 		Serial1.print(i);
-		Serial1.print(' ');
+		Serial1.print(F(" "));
 		Serial1.print(_sensor_values[i].address, DEC);
-		Serial1.print('/');
-		Serial1.println(pot.sensor.dev, DEC);
+		Serial1.print(F("/"));
+		Serial1.println(pot.sensor.pin, DEC);
 		if ( _sensor_values[i].address == pot.sensor.dev) {
 			cur_value = _sensor_values[i].pin_values[ pot.sensor.pin ];
 			break;
@@ -312,8 +314,8 @@ int8_t WateringController::check_pot_state(int8_t index, bool save_result, Hardw
 	output->println(';');
 
 	if (should_water) {
-		uint8_t was = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + index/8);
-		was |= (1<<(index%8));
+		uint8_t was = clock.readRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + index / 8);
+		was |= ( 1 << (index % 8) );
 		clock.writeRAMbyte(RAM_POT_STATE_ADDRESS_BEGIN + index/8, was);
 	}
 
@@ -343,7 +345,7 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 	uint8_t data = 0;
 	clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_WATER);
 // 	water_doser.prepareWatering();
-	output->print("real watering:");
+	output->print(F("real watering:"));
 	output->println(real, DEC);
 	uint8_t i = 0, ip = 0;
 	
@@ -423,7 +425,7 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 			
 			if (pc.wc.enabled) {
 // 				continue;
-				output->print("watering to ");
+				output->print(F("watering to "));
 				output->print(pc.name);
 				output->print(' ');
 				output->print(pts[ci].x, DEC);
@@ -437,7 +439,7 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 						leds.digitalWrite(LED_BLUE, HIGH);
 #endif
 					}
-					Serial1.println(F("pipi is OK, saving"));
+					//Serial1.println(F("pipi is OK, saving"));
 					incDayML(pts[ci].index, ml);
 				} else {
 					/*
@@ -565,18 +567,23 @@ void WateringController::printDayStat(HardwareSerial* output)
 	int day_total = 0, ml;
 	for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 		potConfig pot = g_cfg.readPot(i);
+		ml = readDayML(i);
+		
 		output->print(i, DEC);
 		output->print(F(" "));
 		output->print(pot.name);
-		output->print(F(" ("));
+		if (ml < 5) {
+			output->print("!");
+		}
+		output->print(F("    ("));
 		output->print(pot.sensor.dev, DEC);
 		output->print(F(","));
 		output->print(pot.sensor.pin, DEC);
-		output->print(F(") ["));
+		output->print(F(")    ["));
 		output->print(pot.wc.x, DEC);
 		output->print(F(","));
 		output->print(pot.wc.y, DEC);
-		output->print(F("] "));
+		output->print(F("]    "));
 
 		ml = readDayML(i);
 		day_total += ml;
@@ -595,11 +602,11 @@ void WateringController::printDayStat(HardwareSerial* output)
 	
 	WaterStorages ws;
 	output->print(F("Water storage remains:"));
-	uint16_t avail = ws.avail(0) - day_total;
+	uint16_t avail = ws.avail(0);
 	output->println(avail, DEC);
 	
 	output->print(F("Forecast: end of water in "));
-	output->print(floor(avail/(day_total * 1.1)));
+	output->print(floor(avail/(day_total * 1.2)));
 	output->print(F(" days"));
 	
 }
