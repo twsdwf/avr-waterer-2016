@@ -7,9 +7,9 @@ F_CPU=16000000L
 CPPFLAGS += -DUSE_CLI -Wno-write-strings -Wno-unused-variable -DMY_ROOM
 ARDUINO_LIBS += BH1750 RTClib AT24Cxxx Wire PCF8574 MCP23017 EEPROM Servo OneWire
 #-DMY_ROOM
-AVRDUDE_CONF = /root/arduino-1.6.8/hardware/tools/avr/etc/avrdude.conf
-AVRDUDE = /root/arduino-1.6.8/hardware/tools/avr/bin/avrdude
-ARDUINO_DIR=/root/arduino-1.6.8
+AVRDUDE_CONF = /home/twsdwf/arduino-1.6.8/hardware/tools/avr/etc/avrdude.conf
+AVRDUDE = /usr/bin/avrdude
+ARDUINO_DIR=/home/twsdwf/arduino-1.6.8
 ARDUINO_LIB_PATH=/ardugit/new_water/libs
 USER_LIB_PATH=/ardugit/new_water/libs
 ARDUINO_PLATFORM_LIB_PATH=/ardugit/new_water/libs

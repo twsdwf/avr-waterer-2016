@@ -19,8 +19,8 @@ typedef enum AirTime{
 class WaterDoserSystem
 {
 protected:
-	uint8_t  expander_addr, z_pos;
-	uint16_t expander_state;
+	uint8_t  expander_addr;
+	uint8_t _b_inited;
 	I2CExpander* exp;
 	int8_t cur_x, cur_y, errcode, _is_run;
 	void bwdX();
@@ -35,6 +35,7 @@ protected:
 	void __isr_off();
 	void __isr_reset();
 public:
+    bool isInited();
 	void stopX();
 	void stopY();
 	bool isRun();

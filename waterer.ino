@@ -61,7 +61,7 @@ extern "C" {
 /** ************************************************************************************************
  * 			GLOBAL VARIABLES
 ***************************************************************************************************/
-#define USE_ESP8266
+// #define USE_ESP8266
 
 #if 0
 	//OneWire ds(12);
@@ -77,6 +77,7 @@ extern "C" {
 	
 
 volatile uint32_t last_check_time = 0;
+uint8_t lamp_state = 0;
 
 RTC_DS1307 clock;
 
@@ -416,13 +417,17 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			water_doser.parkY();
 			++ptr;
 		}
-		int x,y;
+		int x=-1,y=-1;
 		set_field<int>(x, &ptr);
 		set_field<int>(y, &ptr);
 		output->print(x, DEC);
 		output->print(F(" "));
 		output->print(y, DEC);
-		water_doser.moveToPos(x, y);
+		if (x > -1 && y > -1) {
+			water_doser.moveToPos(x, y);
+		} else {
+			Serial1.println(F("bad pos"));
+		}
 	} else if (IS_P(cmd, PSTR("iic"), 3)) {
 		i2cExpander.i2c_on();
 		if (IS_P(cmd+4, PSTR("off"), 3)) {
@@ -501,7 +506,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			}
 			*dst = 0;
 			g_cfg.savePot(pi, pc);
-		} else if (IS_P(cmd + 4, PSTR("find"), 4)) {
+		}/* else if (IS_P(cmd + 4, PSTR("find"), 4)) {
 			int chip=-1, pin=-1;
 			char*ptr=cmd+4+5;
 			set_field<int>(chip, &ptr);
@@ -519,7 +524,7 @@ bool doCommand(char*cmd, HardwareSerial*output)
 					output->println(F("not found;"));
 				}
 			}
-		} else if (IS_P(cmd + 4, PSTR("get"), 3)) {
+		}*/ else if (IS_P(cmd + 4, PSTR("get"), 3)) {
 			if (IS_P(cmd+4+4, PSTR("count"), 5)) {
 				output->print(g_cfg.config.pots_count, DEC);
 				output->println(";");
@@ -554,16 +559,44 @@ bool doCommand(char*cmd, HardwareSerial*output)
 			set_field<uint8_t>(index, &ptr);
 			Wizard w;
 			w.edit_pot(index);
-		}
-		
+		} else if (IS_P(cmd + 4, PSTR("pgm"), 3)) {
+			uint8_t index;
+			char*ptr=cmd + 8;
+			set_field<uint8_t>(index, &ptr);
+
+			potConfig pc = g_cfg.readPot(index);
+			Wizard w;
+			w.getPgm(pc, index);
+			if (w.ask_char(F("Save?"), "YN") == 'Y') {
+				g_cfg.savePot(index, pc);
+			}
+		}/* else if (IS_P(cmd + 4, PSTR("off"), 3)) {
+			uint8_t index;
+			char*ptr=cmd + 8;
+			set_field<uint8_t>(index, &ptr);
+
+			potConfig pc = g_cfg.readPot(index);
+			pc.wc.enabled = 0;
+			g_cfg.savePot(index, pc);
+		} else if (IS_P(cmd + 4, PSTR("on"), 3)) {
+			uint8_t index;
+			char*ptr=cmd + 8;
+			set_field<uint8_t>(index, &ptr);
+
+			potConfig pc = g_cfg.readPot(index);
+			pc.wc.enabled = 1;
+			g_cfg.savePot(index, pc);
+		} else if (IS_P(cmd + 4, PSTR("test"), 3)) {
+			
+		}*/
 	} else if (IS_P(cmd, PSTR("cfg"), 3)) {
-		if (IS_P(cmd + 4, PSTR("get"), 3)) {
-			printGcfg(output);
-		} else if (IS_P(cmd + 4, PSTR("set"), 3)) {
+		if (IS_P(cmd + 4, PSTR("set"), 3)) {
 			Wizard w;
 			w.cfg_run();
-			printGcfg(output);
+		} else if (IS_P(cmd + 4, PSTR("read"), 4)) {
+			 g_cfg.readGlobalConfig();
 		}
+		printGcfg(output);
 	} else if (IS_P(cmd, PSTR("start"), 5)) {
 		clock.writeRAMbyte(RAM_CUR_STATE, CUR_STATE_IDLE);
 		g_cfg.config.enabled = 1;
@@ -601,19 +634,22 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		} else if (IS_P(cmd + 5, PSTR("off"), 3)){
 			leds.digitalWrite(MCP_RELAY_LEDS, LOW);
 			leds.digitalWrite(MCP_RELAY_TUBELAMPS, LOW);
+		} else if (cmd[4]=='?') {
+			Serial1.print(F("state:"));
+			Serial1.println(lamp_state, DEC);
 		}
 	} else if (IS_P(cmd, PSTR("wst"), 3)) {
 		if (IS_P(cmd+4, PSTR("dec"), 3)) {
 			uint8_t index;
 			WaterStorages ws;
-			WaterStorageData wsd = ws.readNonemptyStorage(index);
+			WaterStorageData wsd = ws.readNonemptyStorage(index, 12);
 			Serial1.print(F("ws index:"));
 			Serial1.println(index, DEC);
 			ws.dec(index, 12);
 		} else if (IS_P(cmd+4, PSTR("rne"), 3)) {
 			uint8_t index;
 			WaterStorages ws;
-			WaterStorageData wsd = ws.readNonemptyStorage(index);
+			WaterStorageData wsd = ws.readNonemptyStorage(index, 0);
 		} else if (IS_P(cmd + 4, PSTR("full"), 4)) {
 			uint8_t index=0;
 			WaterStorageData wsd;
@@ -695,9 +731,9 @@ void checkCommand()
 		if(ch == ';') {
 			if ( i == 0 ) continue;
 			cmdbuf[ i ] = 0;
- 			Serial1.print("cmd=[");
+ 			Serial1.print(F("cmd=["));
  			Serial1.print(cmdbuf);
- 			Serial1.println("]");
+ 			Serial1.println(F("]"));
 			doCommand(cmdbuf, &Serial1);
 			i = 0;
 		} else {
@@ -753,18 +789,16 @@ void setup()
 	Serial1.begin(BT_BAUD);
  	Serial1.println(F("HELLO;"));
 	pinMode(25, INPUT_PULLUP);
-	
 	Wire.begin();
 	clock.begin();
 	g_cfg.begin();
- 	g_cfg.readGlobalConfig();
+	g_cfg.readGlobalConfig();
 	g_cfg.config.esp_en  = 0;
-	g_cfg.config.water_start_time = 720;
+	/*g_cfg.config.water_start_time = 720;
 	g_cfg.config.water_end_time = 2000;
 	g_cfg.config.water_start_time_we = 720;
-	g_cfg.config.water_end_time_we = 2000;
- 	water_doser.begin();
-	wctl.init(&i2cExpander);
+	g_cfg.config.water_end_time_we = 2000;*/
+    wctl.init(&i2cExpander);
 	
 	leds.begin(MCP_EXT_ADDR);
  	
@@ -778,10 +812,28 @@ void setup()
 			((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_3)<<8) |
 			((uint32_t)clock.readRAMbyte(LAST_CHECK_TS_4) & 0xFF);
  	
-	esp8266.begin(9600, 52);
+// 	esp8266.begin(9600, 52);
 	
 	Serial1.println(F("setup() ok"));
-	Serial1.println(getFreeMemory(), DEC);
+	delay(500);
+	//Serial1.println(getFreeMemory(), DEC);
+	pinMode(A2, INPUT);
+	pinMode(A3, INPUT);
+	pinMode(A4, INPUT);
+	pinMode(A5, INPUT);
+    
+	DateTime now = clock.now();
+	uint16_t now_m = now.hour() * 100 + now.minute();
+    if (now_m >= 2360 || now.year() < 2016) {
+        Serial1.println(F("bad time in begin"));
+    } else {
+        last_check_time = now.secondstime();
+        
+        if (now_m >= 800 && now_m <= 2100) {
+            water_doser.begin();
+        }
+    }
+    
 	return;
 }
 
@@ -843,45 +895,40 @@ void sendDailyReport()
 }
 #endif
 
-uint8_t lamp_state = 0;
-
 void loop()
 {
-
-
-// 	NaLamp.setBlock(digitalRead(25) == HIGH);
-#if 0
-	if (0 && leds.digitalRead(VBTN_WATERTEST) == LOW) {
-		pinMode(PUMP_PIN, OUTPUT);
-		digitalWrite(PUMP_PIN, HIGH);
-// 		pinMode(VCC_PUMP_EN, OUTPUT);
-// 		digitalWrite(VCC_PUMP_EN, HIGH);
-		delay(5000);
-		digitalWrite(PUMP_PIN, LOW);
-// 		digitalWrite(VCC_PUMP_EN, LOW);
-		leds.digitalWrite(LED_BLUE, LOW);
-
-		WaterStorages ws;
-		WaterStorageData wsd = ws.readStorageData(0);
-		wsd.enabled = 1;
-		wsd.vol = 10000;
-		wsd.spent = 0;
-		wsd.pump_pin = PUMP_PIN;
-		wsd.prior = 1;
-		ws.updateStorageData(0, wsd);
-		ws.setStorageStateFull(0);
+ //Serial1.print(".");
+ delay(500);
+ 
+	if (digitalRead(A3) == HIGH) {
+		delay(1000);
+		if (digitalRead(A3) == HIGH) {
+			pinMode(PUMP_PIN, OUTPUT);
+			digitalWrite(PUMP_PIN, HIGH);
+			delay(5000);
+			digitalWrite(PUMP_PIN, LOW);
+			WaterStorages ws;
+			ws.setStorageStateFull(0);
+		}
 	}
-// 	leds.digitalWrite(0, _pulse_state);
-#endif
+	
+	if (digitalRead(A2) == HIGH) {
+		delay(1000);
+		if (digitalRead(A2) == HIGH) {
+			pinMode(PUMP2_PIN, OUTPUT);
+			digitalWrite(PUMP2_PIN, HIGH);
+			delay(5000);
+			digitalWrite(PUMP2_PIN, LOW);
+			WaterStorages ws;
+			ws.setStorageStateFull(1);
+		}
+	}
+
    	checkCommand();	
 #if 0
 // 	if (g_cfg.config.esp_en) {
 // 		esp8266.process();
 // 	}
-	if (now.minute() % 5 == 0 && now_m != last_temp_read) {
-		readDS18B20();
-		last_temp_read = now_m;
-	}
 #endif
 
 	DateTime now = clock.now();
@@ -892,8 +939,9 @@ void loop()
 		Serial1.println(now_m);
 	}
 	
-	
-	if (now_m > 2400 || now.year() < 2016) {
+// 	Serial1.print("!");
+// delay(500);
+	if (now_m >= 2360 || now.year() < 2016) {
 		print_now(&Serial1);
 #ifdef USE_ESP8266
 		if (g_cfg.config.esp_en) {
@@ -906,7 +954,8 @@ void loop()
 		return;
 	}
 	
-	
+// 	Serial1.print("~");
+// delay(500);
 	if ( (now_m >=800 && now_m < 1930) && !lamp_state) {
 		leds.digitalWrite(MCP_RELAY_LEDS, HIGH);
 		leds.digitalWrite(MCP_RELAY_TUBELAMPS, HIGH);
@@ -919,6 +968,8 @@ void loop()
 		lamp_state = 0;
 	}
 	
+// 	Serial1.print("*");
+// delay(500);
 // 	checkContinue();
 
 	bool b_time_to_water = (now.dayOfWeek() < 6 && now_m > g_cfg.config.water_start_time && now_m < g_cfg.config.water_end_time)
@@ -935,13 +986,18 @@ void loop()
 		
 		midnight_skip = false;
 		
-		if ( (now.secondstime() - last_check_time) % 60 == 0) {
+		if ( (now.secondstime() - last_check_time) % 60 < 2) {
 			Serial1.print(F("next check after "));
 			Serial1.print(g_cfg.config.test_interval - (now.secondstime() - last_check_time)/60, DEC);
 			Serial1.println(F(" minutes"));
 		}
 		
 		if ( ((now.secondstime() - last_check_time) / 60 >= g_cfg.config.test_interval) || iForceWatering) {
+            if (! water_doser.isInited()) {
+                water_doser.begin();
+            }
+            
+			g_cfg.readGlobalConfig();
  			wctl.doPotService(1, &Serial1);
 			now = clock.now();
 			last_check_time = now.secondstime();
@@ -964,8 +1020,8 @@ void loop()
 		}
 #endif
 	}
-	if (now_m < 2 && !midnight_skip) {//midnight
-//  		Serial1.println("midnight jobs");
+	if (now_m < 200 && !midnight_skip) {//midnight
+		Serial1.println(F("midnight tasks"));
 		last_check_time = 0;
 		clock.writeRAMbyte(LAST_CHECK_TS_1, 0);
 		clock.writeRAMbyte(LAST_CHECK_TS_2, 0);
@@ -975,13 +1031,13 @@ void loop()
 
 		midnight_skip = true;
 		
-		uint16_t ml = 0, day_total;
-		
+// 		uint16_t ml = 0, day_total;
+		/*
 		for (int i = 0; i < g_cfg.config.pots_count; ++i) {
 			ml = wctl.readDayML(i);
 			day_total += ml;
 		}//for i
-		
+		*/
 		//WaterStorages ws;
 		//ws.dec(0, day_total);
 #ifdef USE_ESP8266
@@ -989,9 +1045,12 @@ void loop()
 			now = esp8266.getTimeFromNTPServer();
 			clock.adjust(now);
 		}
-#endif		
+#endif	
+Serial1.println(F("lct cleared"));
 		wctl.cleanDayStat();
+		Serial1.println(F("cleanDayStat() ok"));
 		wctl.setStatDay(now.day());
+		Serial1.println(F("setStatDay() ok"));
 	}
 // 		- last_check_time > g_cfg.config.
 //  	Serial1.println("ping");

@@ -58,7 +58,7 @@ void WateringController::incDayML(uint8_t index, uint16_t inc)
 
 WateringController::WateringController(I2CExpander* _exp) {
 // 	init(_exp);
-// 	_sensor_values=NULL;
+ 	_sensor_values=NULL;
 }
 
 WateringController::~WateringController()
@@ -69,7 +69,6 @@ WateringController::~WateringController()
 void WateringController::init(I2CExpander* _exp)
 {
 	i2cexp = _exp;
-// 	_sensor_values = NULL;
 		uint8_t bits = 0, bitsa=0, cp=0;
 		sv_count = 0;
 
@@ -90,7 +89,7 @@ void WateringController::init(I2CExpander* _exp)
 		}
    		Serial1.print(F("device count:"));
    		Serial1.println(sv_count, DEC);
-		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues)*sv_count);
+		_sensor_values = (sensorValues*)malloc(sizeof(sensorValues) * sv_count);
 		if (_sensor_values == 0) {
 			Serial1.println(F("FATAL ERROR: malloc() failed;"));
 			return;
@@ -99,9 +98,14 @@ void WateringController::init(I2CExpander* _exp)
 		memset(_sensor_values, 0, sizeof(sensorValues) * sv_count);
 
 		uint8_t index = 0;
+		Serial1.print(F("bits="));
+		Serial1.print(bits, BIN);
+		Serial1.print(F("bitsa="));
+		Serial1.println(bitsa, BIN);
+		
 		
 		for (uint8_t i = 0; i < 8; ++i) {
-			if (index < sv_count && _sensor_values[index].address!=0) {
+			if (index < sv_count && _sensor_values[ index ].address != 0) {
 				Serial1.println(F("ERROR: possible stack roof broken!;"));
 			}
 			if (bits & (1<<i)) {
@@ -113,6 +117,9 @@ void WateringController::init(I2CExpander* _exp)
 				++index;
 			}
 		}
+		Serial1.print(F("index="));
+		Serial1.println(index, DEC);
+		
 }
 
 void WateringController::dumpSensorValues(HardwareSerial*output)
@@ -125,7 +132,7 @@ void WateringController::dumpSensorValues(HardwareSerial*output)
 		Serial1.print(F("addr:"));
 		Serial1.println(_sensor_values[i].address, DEC);
 
-		if (!i2cexp->readSensorValues( &_sensor_values[i]) ) {
+		if (!i2cexp->readSensorValues( _sensor_values[i]) ) {
 			Serial1.print(F("ERROR while read sensors at address "));
 			Serial1.print((_sensor_values+i)->address, DEC);
 			Serial1.println(';');
@@ -164,7 +171,7 @@ int WateringController::run_checks(HardwareSerial* output)
 		Serial1.print(F("addr:"));
 		Serial1.println(_sensor_values[i].address, DEC);
 		
-		if (!i2cexp->readSensorValues( &_sensor_values[i]) ) {
+		if (!i2cexp->readSensorValues( _sensor_values[i]) ) {
 			output->print(F("ERROR while read sensors at address "));
 			output->print((_sensor_values+i)->address, DEC);
 			output->println(';');
@@ -192,11 +199,17 @@ void WateringController::doPotService(bool check_and_watering, HardwareSerial*ou
 	
 // 	if (state == CUR_STATE_IDLE) {
 		sw = run_checks(output);
- 		Serial1.print(F("sw = "));
- 		Serial1.print(sw, DEC);
- 		Serial1.println(';');
+//  		Serial1.print(F("sw = "));
+//  		Serial1.print(sw, DEC);
+//  		Serial1.println(';');
 // 	} else if(state == CUR_STATE_WATER) {
-		run_watering(check_and_watering, output);
+		WaterStorages ws;
+		if (ws.availTotal() > 0) {
+			run_watering(check_and_watering, output);
+		} else {
+			Serial1.println(F("No water at all"));
+			return;
+		}
 // 	}
 	DateTime now2 = clock.now();
  	output->print(F("watering time: "));
@@ -337,7 +350,7 @@ float distance(const coords& a, const coords& b)
 	if (b.x == -1 || b.y == -1) {
 		return sqrt(a.x * a.x + a.y * a.y);
 	}
-	return sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+	return sqrt((a.x - b.x)*(a.x - b.x) * 4 + (a.y - b.y)*(a.y - b.y));
 }
 
 void WateringController::run_watering(bool real, HardwareSerial* output)
@@ -411,8 +424,8 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				ci = i;
 			}
 		}
- 		Serial1.print(F("ci="));
- 		Serial1.println(ci, DEC);
+//  		Serial1.print(F("ci="));
+//  		Serial1.println(ci, DEC);
 		if ( ci > -1) {
 			Serial1.print(" (");
 			Serial1.print(pts[ci].index);
@@ -435,9 +448,7 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 				if (real) {
 					uint16_t ml = water_doser.pipi(pts[ci].x, pts[ci].y, pc.wc.ml);
 					if (ml < 1) {
-#ifdef MY_ROOM
-						leds.digitalWrite(LED_BLUE, HIGH);
-#endif
+						return;
 					}
 					//Serial1.println(F("pipi is OK, saving"));
 					incDayML(pts[ci].index, ml);
@@ -601,8 +612,8 @@ void WateringController::printDayStat(HardwareSerial* output)
 	output->println(F("ml"));
 	
 	WaterStorages ws;
-	output->print(F("Water storage remains:"));
-	uint16_t avail = ws.avail(0);
+	output->print(F("Water storages remain:"));
+	uint16_t avail = ws.availTotal();
 	output->println(avail, DEC);
 	
 	output->print(F("Forecast: end of water in "));

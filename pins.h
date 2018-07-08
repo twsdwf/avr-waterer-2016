@@ -67,15 +67,4 @@
 // D16 & D17 -- IIC
 // D18 & D19 --Serial1
 
-#ifdef MY_ROOM
-// 	#define PLANT_LIGHT_PIN 	12
-	//#define AQUARIUM_PIN		51
-// 	#define Z_AXE_UP_PIN		A6
-// 	#define Z_AXE_DOWN_PIN		35 //digital
-#else
-// 	#define Z_AXE_UP_PIN	 	51
-#endif
-
-
-
 #endif

@@ -95,7 +95,28 @@ bool Configuration::readGlobalConfig()
 	memcpy(&this->config, buffer + 2, sizeof(globalConfig));
 	if (this->config.pots_count >= MAX_POTS) {
 		this->config.pots_count = 0;
-	}
+	}/*	uint16_t enabled:1;
+	uint16_t esp_en:1;
+	uint16_t flags:13;
+// 	uint8_t i2c_expanders_count;
+	uint8_t pots_count;
+// 	uint8_t dosers_count;
+	uint16_t i2c_pwron_timeout;
+	uint16_t sensor_init_time;
+	uint16_t sensor_read_time;
+	uint16_t water_start_time;
+	uint16_t water_end_time;
+	uint16_t water_start_time_we;
+	uint16_t water_end_time_we;
+	uint8_t sensor_measures;
+	uint8_t test_interval;*/
+// 	config.sensor_init_time = 1000;
+// 	config.sensor_read_time = 10;
+// 	config.test_interval = 90;
+// 	config.sensor_measures = 3;
+// 	config.i2c_pwron_timeout = 1000;
+// 	config.water_start_time = 720;
+// 	config.water_end_time = 2000;
 	return true;
 }
 

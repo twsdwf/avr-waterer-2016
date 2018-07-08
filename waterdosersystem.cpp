@@ -157,6 +157,7 @@ extern bool checkContinue();
 WaterDoserSystem::WaterDoserSystem(){
 	expander_addr = 0;
 	exp = NULL;
+    _b_inited = false;
 }
 
 WaterDoserSystem::~WaterDoserSystem()
@@ -166,23 +167,22 @@ WaterDoserSystem::~WaterDoserSystem()
 	sei();
 }
 
+bool WaterDoserSystem::isInited()
+{
+    return this->_b_inited;
+}
+
 void WaterDoserSystem::dope(AirTime at)
 {
 	pinMode(AIR_PIN, OUTPUT);
 	digitalWrite(AIR_PIN, HIGH);
 	uint8_t n = 0;
 	if (at == atShort) {
-		n = 6 * 2;
+		delay(5000);
 	} else if(at == atMedium){
-		n = 8 * 2;
+		delay(10000);
 	}else {
-		n = 12 * 2;
-	}
-	for (uint8_t i = 0; i < n; ++i) {
-		if (!checkContinue()) {
-			break;
-		}
-		delay(500);
+		delay(15000);
 	}
 	digitalWrite(AIR_PIN, LOW);
 }
@@ -258,6 +258,7 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 	*/
 	park();
 	Serial1.println(F("wd begin [DONE]"));
+    _b_inited = true;
 }
 
 void WaterDoserSystem::testAll()
@@ -385,6 +386,8 @@ void WaterDoserSystem::servoUp()
 	Serial1.print(F("result:"));
 	Serial1.println(errcode, DEC);
   }
+  Serial1.print(F("up in "));
+  Serial1.println(millis()-start, DEC);
 }//sub
 
 bool WaterDoserSystem::servoDown()
@@ -401,7 +404,7 @@ bool WaterDoserSystem::servoDown()
 	digitalWrite(Z_AXE_EN, HIGH);
 	//Serial1.println(F("Z to DDC"));
 	while(LOW == digitalRead(Z_END_PIN)) {
-		if (millis() - start > 20000UL) {
+		if (millis() - start > 25000UL) {
 			errcode = WDERR_POS_ERR;
 			break;
 		}
@@ -409,6 +412,8 @@ bool WaterDoserSystem::servoDown()
   digitalWrite(Z_AXE_DIR2, LOW);
   digitalWrite(Z_AXE_DIR, LOW);
   digitalWrite(Z_AXE_EN, LOW);
+	Serial1.print(F("down in "));
+  Serial1.println(millis()-start, DEC);
   //Serial1.println(F("Z to DDC [OK]"));
   return !errcode;
 }
@@ -467,16 +472,22 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
  	uint16_t wftpl = 3900;
  	uint16_t ticks = round( (float)ml * (float)wftpl * 0.001);
  	__wfs_run_mode = wdstWater;
+	
+	errcode = 0;
+	
  	exp->begin(expander_addr);
-	pinMode(PUMP_PIN, OUTPUT);
-	digitalWrite(PUMP_PIN, HIGH);
 	WaterStorages ws;
 	uint8_t ws_index;
-	WaterStorageData wsd = ws.readNonemptyStorage(ws_index);
-	Serial1.print(F("Selected storage #"));
-	Serial1.print(ws_index);
-	Serial1.print(F(" pump pin:"));
-	Serial1.println(wsd.pump_pin);
+	WaterStorageData wsd = ws.readNonemptyStorage(ws_index, ml);
+	if (ws_index > 100) {
+		Serial1.println(F("FATAL ERROR: no water"));
+		return 0;
+	}
+	
+// 	Serial1.print(F("Selected storage #"));
+// 	Serial1.print(ws_index);
+// 	Serial1.print(F(" pump pin:"));
+// 	Serial1.println(wsd.pump_pin);
 	
 	pinMode(wsd.pump_pin, OUTPUT);
 	digitalWrite(wsd.pump_pin, HIGH);
@@ -495,9 +506,6 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 			start_millis = millis();
 		}
 		prev = state;
-// 		if (millis() % 500 == 0) {
-// 			if (!checkContinue()) break;
-// 		}
 	}//while
 
 	digitalWrite(wsd.pump_pin, LOW);
@@ -513,25 +521,15 @@ uint16_t WaterDoserSystem::measure(uint16_t ml, uint16_t timeout)
 		Serial1.println(ticks, DEC);
 
 		errcode = WDERR_WFS_DEAD;
-			/*esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 8000);
-			delay(4000);
-			if (esp8266.sendCmd_P(PSTR("AT+CIPSTART=4,\"TCP\",\"192.168.42.1\",15566"), true, s_OK, 10000)) {
-				if (esp8266.sendCmd_P(PSTR("AT+CIPSENDEX=4,2000\r\n"), true, gt, 10000)) {
-					Serial.println("ERROR: no water in tank!");
-					Serial.print("__wfs_flag: ");
-					Serial.println(__wfs_flag, DEC);
-					Serial.print("ticks: ");
-					Serial.println(ticks, DEC);
-		// 				Serial.write(0);
-					esp8266.sendZeroChar("SEND OK", 10000);
-		// 					delay(2000);
-				} else {
-					Serial1.println(F("Send not inited=("));
-				}
-			}
-			esp8266.sendCmd_P(PSTR("AT+CIPCLOSE=4"), true, s_OK, 3000);
-		*/
  	}
+ 	
+ 	if (errcode == WDERR_WFS_DEAD) {
+		ws.setStorageStateEmpty(ws_index);
+		Serial1.print(F("tank "));
+		Serial1.print(ws_index, DEC);
+		Serial1.print(F(" is empty. Trying again"));
+		return this->measure(ml, 16000);
+	}
 // 	Serial1.println(__LINE__, DEC);
 	//Serial1.println(F("end of measure"));
 //  	Serial1.flush();
@@ -620,7 +618,7 @@ void WaterDoserSystem::__isr_reset()
 
 bool WaterDoserSystem::park()
 {
-	uint8_t bits = AXE_X | AXE_Y;
+	uint8_t bits = AXE_X | AXE_Y/*, a, b*/;
 	
 	errcode = 0;
 	
@@ -631,12 +629,18 @@ bool WaterDoserSystem::park()
 		return false;
 	}
 	__isr_off();
+// 	__isr_reset();
+// 	bx = 0xFFFF;
+// 	by = 0xFFFF;
+	
+// 	uint32_t ts = millis();
 	
 	bwdX();
 	bwdY();
 	
+// 	__isr_en();
 	
-	while (bits) {
+	while ( bits ) {
 		if (digitalRead(X_BEGIN_PIN) == HIGH && (bits & AXE_X)) {
 			stopX();
 			Serial1.println(F("X at begin"));
@@ -648,6 +652,26 @@ bool WaterDoserSystem::park()
 			Serial1.println(F("Y at begin"));
 			bits &= ~AXE_Y; 
 		}
+		/*if (millis() - ts > 2000) {
+			cli();
+			a = bx;
+			b = by;
+			sei();
+			if (a == 0xFFFF) {
+				Serial1.println(F("X axe is jammed!"));
+				stopX();
+				stopY();
+				bits = 0;
+				return false;
+			}
+			if (b == 0xFFFF) {
+				Serial1.println(F("Y axe is jammed!"));
+				stopY();
+				stopX();
+				bits = 0;
+				return false;
+			}
+		}*/
 	}
 	
 	fwdY();
@@ -739,16 +763,17 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 bool WaterDoserSystem::__moveToPos(uint8_t x, uint8_t y)
 {
 	
-	if (cur_x == 0xFF || cur_y == 0xFF) {
+	if (cur_x == -1 || cur_y == -1) {
 		this->park();
 	}
+	uint32_t start = millis();
 	
 	Serial1.print(millis(), DEC);
 	Serial1.print(F("("));
 	Serial1.print(cur_x, DEC);
 	Serial1.print(F(", "));
 	Serial1.print(cur_y);
-	Serial1.println(F(")=>"));
+	Serial1.print(F(") => "));
 	Serial1.print(F("("));
 	Serial1.print(x, DEC);
 	Serial1.print(F(", "));
@@ -778,10 +803,12 @@ bool WaterDoserSystem::__moveToPos(uint8_t x, uint8_t y)
 	}
 	
 	while (isRun()) {
-		delay(500);
+		delay(100);
 	}
 	cur_x = x;
 	cur_y = y;
+	Serial1.print(F("moved in "));
+	Serial1.println(millis()-start, DEC);
 	//Serial1.println(F("pos ok"));
 	return true;
 }
@@ -798,14 +825,17 @@ bool WaterDoserSystem::isRun()
 uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 {
 	errcode = 0;
+	
 	if(!this->moveToPos(x, y)) {
 		Serial1.println(F("ERROR while positioning;"));
 		return 0;
 	}
+	
 	if (!servoDown()) {
 		Serial1.println(F("ERROR: Z-axe fault"));
 		return 0;
 	}
+	
 	if (errcode > 0) {
 		servoUp();
 		Serial1.print(F("STOP due fatal error "));
@@ -813,13 +843,12 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 		Serial1.println(F(";"));
 		return 0;
 	}
-// 	Serial1.println(F("pipi"));
 	pinMode(AIR_PIN, OUTPUT);
- 	digitalWrite(AIR_PIN, HIGH);
+ 	digitalWrite(AIR_PIN, LOW);
 // 	this->init_measure();
 	uint16_t ret_ml = this->measure(ml, 5000);
-	Serial1.print(ret_ml, DEC);
-	Serial1.println(F(";"));
+// 	Serial1.print(ret_ml, DEC);
+// 	Serial1.println(F(";"));
 	dope(at);
 // 	servoUp();
 // 	delay(500);

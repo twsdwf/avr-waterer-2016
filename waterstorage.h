@@ -13,11 +13,12 @@ public:
 	void updateStorageData(uint8_t index, WaterStorageData& data);
 	uint8_t addStorage(WaterStorageData& data);
 	bool deleteStorage(uint8_t index);
-	WaterStorageData readNonemptyStorage(uint8_t& index);
+	WaterStorageData readNonemptyStorage(uint8_t& index, uint8_t min_ml);
 	uint8_t getStoragesCount();
 	void setStorageStateFull(uint8_t index);
 	void setStorageStateEmpty(uint8_t index);
 	void dec(uint8_t index, uint16_t ml);
 	uint16_t avail(uint8_t index);
+	uint16_t availTotal();
 };
 #endif

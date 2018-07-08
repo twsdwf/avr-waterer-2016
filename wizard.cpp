@@ -206,7 +206,7 @@ void Wizard::ask_str(const __FlashStringHelper* promt, char*buf, int maxlen,bool
 		Serial1.print(buf);
 		Serial1.println(F(")"));
 	}
-	memset(buf, 0, maxlen + 1);
+	//memset(buf, 0, maxlen + 1);
 // 	Serial1.flush();
 	char*pb = buf;
 	while (1) {
@@ -215,6 +215,7 @@ void Wizard::ask_str(const __FlashStringHelper* promt, char*buf, int maxlen,bool
 			Serial1.write(ch);
 			Serial1.flush();
 			if (ch == 10 || ch == 13) {
+				*pb = 0;
 				Serial1.println();
 				return;
 			}
@@ -352,7 +353,21 @@ void Wizard::edit_pot(uint8_t index)
 	ask_uint16(F("Air time(1-short, 2-medium, 3-long)"), 1, 3, x);
 	pc.wc.airTime = x;
 	pc.wc.enabled = ask_char(F("Enable watering(Y/N)"), "YN") == 'Y';
-	x = pc.wc.ml;
+	
+	this->getPgm(pc, index);
+	
+	if (ask_char(F("Write pot config?"), "YN") == 'Y') {
+		g_cfg.savePot(index, pc);
+	}
+	if (ask_char(F("Clear day stat for plant?"), "YN") == 'Y') {
+		wctl.writeDayML(index, 0);
+	}
+	Serial1.println(F("[done]"));	
+}
+
+void Wizard::getPgm(potConfig &pc, uint8_t pot_index)
+{
+	uint16_t x = pc.wc.ml;
 	ask_uint16(F("Portion, ml(5..100):"), 5, 100, x);
 	pc.wc.ml = x;
 
@@ -372,14 +387,6 @@ void Wizard::edit_pot(uint8_t index)
 		x = pc.pgm.hum_and_dry.max_ml;
 		pc.pgm.hum_and_dry.max_ml = ask_uint16(F("daymax, ml:"), 1, 1023, x);
 	}
-	
-	if (ask_char(F("Write pot config?"), "YN") == 'Y') {
-		g_cfg.savePot(index, pc);
-	}
-	if (ask_char(F("Clear day stat for plant?"), "YN") == 'Y') {
-		wctl.writeDayML(index, 0);
-	}
-	Serial1.println(F("[done]"));	
 }
 
 void Wizard::run(uint8_t show_hello)

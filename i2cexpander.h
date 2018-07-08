@@ -11,7 +11,7 @@ protected:
 public:
 	I2CExpander();
 	int16_t read_pin(uint8_t addr, uint8_t pin);
-	bool readSensorValues(sensorValues*data);
+	bool readSensorValues(sensorValues& data);
 	virtual ~I2CExpander();
 // 	uint8_t get_mode();
 // 	void set_mode(uint8_t m);
