@@ -87,7 +87,7 @@ ISR(INT5_vect)
 
 ISR(INT6_vect) 
 {
-  if (PINC & BS(7)) { // X end switch pushed down
+  if (PINC & BS(7)) { // Y end switch pushed down
     ++yesw_cnt;
     if (yesw_cnt > ES_HITS) {
       cli();
@@ -247,8 +247,11 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 		Serial1.print(digitalRead(X_END_PIN), DEC);
 		Serial1.print(" y begin:");
 		Serial1.print(digitalRead(Y_BEGIN_PIN), DEC);
-		Serial1.print(" y end:");
+		Serial1.print(" y step:");
+		Serial1.print(digitalRead(Y_STEP_PIN), DEC);
+        Serial1.print(" y end:");
 		Serial1.print(digitalRead(Y_END_PIN), DEC);
+        
 		Serial1.print(" z begin:");
 		Serial1.print(digitalRead(Z_BEGIN_PIN), DEC);
 		Serial1.print(" z end:");
@@ -256,6 +259,7 @@ void WaterDoserSystem::begin(/*uint8_t _expander_addr, I2CExpander*_exp*/)
 		delay(500);
 	}//while
 	*/
+Serial1.println(F("wd.begin(), parking..."));
 	park();
 	Serial1.println(F("wd begin [DONE]"));
     _b_inited = true;
@@ -374,7 +378,7 @@ void WaterDoserSystem::servoUp()
 // 	Serial1.println(F("move Z to TDC"));
 
 	while(LOW == digitalRead(Z_BEGIN_PIN)) {
-		if (millis() - start > 20000UL) {
+		if (millis() - start > 60000UL) {
 			errcode = WDERR_POS_ERR;
 			break;
 		}
@@ -404,7 +408,7 @@ bool WaterDoserSystem::servoDown()
 	digitalWrite(Z_AXE_EN, HIGH);
 	//Serial1.println(F("Z to DDC"));
 	while(LOW == digitalRead(Z_END_PIN)) {
-		if (millis() - start > 25000UL) {
+		if (millis() - start > 55000UL) {
 			errcode = WDERR_POS_ERR;
 			break;
 		}
@@ -619,7 +623,7 @@ void WaterDoserSystem::__isr_reset()
 bool WaterDoserSystem::park()
 {
 	uint8_t bits = AXE_X | AXE_Y/*, a, b*/;
-	
+	Serial1.println("park()");
 	errcode = 0;
 	
 	servoUp();
@@ -762,10 +766,11 @@ bool WaterDoserSystem::moveToPos(uint8_t x, uint8_t y)
 
 bool WaterDoserSystem::__moveToPos(uint8_t x, uint8_t y)
 {
-	
+	if (!isInited()) this->begin();
 	if (cur_x == -1 || cur_y == -1) {
 		this->park();
 	}
+	
 	uint32_t start = millis();
 	
 	Serial1.print(millis(), DEC);
@@ -786,10 +791,10 @@ bool WaterDoserSystem::__moveToPos(uint8_t x, uint8_t y)
 	bx = abs(dx) * WD_TICKS_PER_STEP;
 	by = abs(dy) * WD_TICKS_PER_STEP;
 	__isr_en();
-	/*Serial1.print(F("bx="));
+	Serial1.print(F("bx="));
 	Serial1.print(bx);
 	Serial1.print(F(" by="));
-	Serial1.println(by);*/
+	Serial1.println(by);
 	
 	if (dx < 0) {
 		bwdX();
@@ -809,7 +814,7 @@ bool WaterDoserSystem::__moveToPos(uint8_t x, uint8_t y)
 	cur_y = y;
 	Serial1.print(F("moved in "));
 	Serial1.println(millis()-start, DEC);
-	//Serial1.println(F("pos ok"));
+	Serial1.println(F("pos ok"));
 	return true;
 }
 
@@ -826,6 +831,10 @@ uint16_t WaterDoserSystem::pipi(uint8_t x, uint8_t y, uint8_t ml, AirTime at)
 {
 	errcode = 0;
 	
+    if (! this->isInited()) {
+        this->begin();
+    }
+    
 	if(!this->moveToPos(x, y)) {
 		Serial1.println(F("ERROR while positioning;"));
 		return 0;

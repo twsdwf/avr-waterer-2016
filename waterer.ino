@@ -469,6 +469,14 @@ bool doCommand(char*cmd, HardwareSerial*output)
 		output->println(F(" "));
 		output->print(__TIME__);
 		output->println(F(";"));
+        output->print(F("since last boot: "));
+        uint32_t m = millis() / 1000;
+        output->print(m / 3600);
+        output->print(F("h "));
+        output->print( (m % 3600) / 60);
+        output->print(F("m "));
+        output->print( (m % 3600) % 60);
+        output->println(F("s"));
 	} else if (IS_P(cmd, PSTR("time"), 4)) {
 		if (IS_P(cmd+5, PSTR("get"), 3)) {
 		} else if (IS_P(cmd+5, PSTR("set"), 3)) {
@@ -824,6 +832,7 @@ void setup()
     
 	DateTime now = clock.now();
 	uint16_t now_m = now.hour() * 100 + now.minute();
+    
     if (now_m >= 2360 || now.year() < 2016) {
         Serial1.println(F("bad time in begin"));
     } else {
@@ -899,7 +908,7 @@ void loop()
 {
  //Serial1.print(".");
  delay(500);
- 
+ /*
 	if (digitalRead(A3) == HIGH) {
 		delay(1000);
 		if (digitalRead(A3) == HIGH) {
@@ -923,7 +932,7 @@ void loop()
 			ws.setStorageStateFull(1);
 		}
 	}
-
+*/
    	checkCommand();	
 #if 0
 // 	if (g_cfg.config.esp_en) {

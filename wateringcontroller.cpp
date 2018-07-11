@@ -361,7 +361,10 @@ void WateringController::run_watering(bool real, HardwareSerial* output)
 	output->print(F("real watering:"));
 	output->println(real, DEC);
 	uint8_t i = 0, ip = 0;
-	
+    
+	if (!water_doser.isInited()) {
+        water_doser.park();
+    }
 	coords pts[32];
 	for (uint8_t addr = RAM_POT_STATE_ADDRESS_BEGIN; addr < RAM_POT_STATE_ADDRESS_END; ++addr, ++i) {
 		data = clock.readRAMbyte(addr);
